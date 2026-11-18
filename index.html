@@ -85,6 +85,10 @@
   .big { display: block; width: 100%; max-width: 420px; margin: 12px auto 0; padding: 16px 0; border: 0; border-radius: 22px; font: 800 20px 'Outfit', sans-serif; color: #063326; background: linear-gradient(#7ef2c8, #2fc49a); box-shadow: 0 8px 0 #1c8a6c, 0 0 30px rgba(126,242,200,.35); }
   .ghost { background: transparent; color: #c7b8ff; box-shadow: inset 0 0 0 2px #7b66d6; font-size: 16px; }
   .ghost[disabled] { opacity: .55; }
+  .brow { display: flex; align-items: center; gap: 10px; max-width: 420px; margin: 10px auto 0; }
+  .brow .dbtn { flex: 0 0 60px; font-size: 24px; }
+  .brow span { flex: 1; font-weight: 800; font-size: 18px; }
+  #botWarn, #rBotWarn { color: #ff8aa8; }
   #diff, #opts { display: flex; gap: 8px; max-width: 420px; margin: 6px auto 0; }
   .dbtn { flex: 1; padding: 13px 0; border: 0; border-radius: 16px; font: 800 16px 'Outfit', sans-serif; color: #c7b8ff; background: transparent; box-shadow: inset 0 0 0 2px #7b66d6; }
   .dbtn.sel { color: #063326; background: linear-gradient(#7ef2c8, #2fc49a); box-shadow: 0 5px 0 #1c8a6c; }
@@ -116,6 +120,8 @@
     <button class="dbtn" id="dHard"></button>
   </div>
   <p id="dInfo"></p>
+  <div class="brow"><button class="dbtn" id="botMinus">−</button><span id="botLbl"></span><button class="dbtn" id="botPlus">+</button></div>
+  <p id="botWarn"></p>
   <button class="big" id="play"></button>
   <input class="txt" id="name" maxlength="10">
   <button class="big ghost" id="mkRoom"></button>
@@ -144,7 +150,8 @@
   <h1 id="roomCode">....</h1>
   <p id="roomMsg"></p>
   <div id="roomPicker" class="pickgrid"></div>
-  <button class="big ghost" id="botBtn"></button>
+  <div class="brow" id="rBotRow"><button class="dbtn" id="rBotMinus">−</button><span id="rBotLbl"></span><button class="dbtn" id="rBotPlus">+</button></div>
+  <p id="rBotWarn"></p>
   <button class="big" id="startBtn"></button>
   <button class="big ghost" id="leaveBtn"></button>
 </div>
@@ -201,13 +208,13 @@ const TYPES = [
   { name:'Višća', c:'#f26a1b', hi:'#ffd0b0', lo:'#6a2a05', p:'#13306e', p2:'#13306e', eye:'#ffffff', tongue:'#13306e', head:'viper', pattern:'stripe', spikes:1, fangs:1 },
   { name:'Fevzi Zemzem', c:'#e2231a', hi:'#ff9a8a', lo:'#5a0805', p:'#ffd200', p2:'#ffd200', eye:'#ffd200', tongue:'#ffd200', head:'slim', pattern:'coral' }
 ];
-const BOT_NAMES = ['Tıslayan','Engerek','Şahmeran','Çıngırak','Karayılan','Sinsi','Gölge','Fısıltı','Sarmal','Avcı','Yutan','Hışırtı','Kıvrım','Pullu','Zehirli','Boğan','Sürüngen','Diş','Kuyruk','Pusu','Kement','Tırpan','Kara Bela','Uzun'];
+const BOT_NAMES = ['Kara Diş','Çatal Dil','Kaygan','Fırtına','Şimşek','Duman','Kor','Buzul','Sessiz','Yılankavi','Zehirdiş','Pul Pul','Gece','Kum','Demir','Sürgün','Dolanbaç','Kıskaç','Tilki','Sızıntı','Tıslayan','Engerek','Şahmeran','Çıngırak','Karayılan','Sinsi','Gölge','Fısıltı','Sarmal','Avcı','Yutan','Hışırtı','Kıvrım','Pullu','Zehirli','Boğan','Sürüngen','Diş','Kuyruk','Pusu','Kement','Tırpan','Kara Bela','Uzun'];
 const DOT_COLS = ['#7ef2c8', '#ff5fb0', '#ffd166', '#6ec3ff', '#c79bff'];
 
 const CELL = 160, TAU = Math.PI * 2;
 let W = 4000, GC = 25, worldNoBots = false;
 function setMap(gc) { GC = gc; W = gc * CELL; }
-const specN = k => GC === 25 ? SPEC[k].n : Math.max(k === 'g50' ? 1 : 2, Math.round(SPEC[k].n * GC * GC / 625));
+const specN = k => Math.max(k === 'g50' ? 1 : 2, Math.round(SPEC[k].n * GC * GC / 625));
 const BOTS = 15, LIVES = 3, START_M = 10, SPLIT_MIN = 16, EQ = 3;
 const MAG_R = 260, MAG_T = 8, HIT_PROT = 3;
 const SPEC = { g10: { n: 6, v: 10, r: 11, w: 10 }, g50: { n: 1, v: 50, r: 17, w: 50 }, mag: { n: 6, v: 0, r: 13, w: 8 },
@@ -218,7 +225,7 @@ const DE_NAMES = ['Gift', 'Schwarze Kobra', 'Lava', 'Hydra', 'Skelett', 'Goldene
 const LOCKS = {};
 const MISSIONS = [['kills', 2], ['len', 80], ['gold', 2], ['mag', 2], ['kills', 3], ['len', 150], ['gold', 4], ['len', 250], ['kills', 5]];
 let roundOn = false, roundLeft = 0, finalOn = false, evId = 0, evKind = '', evNext = 0, speedUntil = 0, kingId = 0, lastKing = 0;
-let lang = 'tr', soundOn = true, shake = 0, mis = null, misIdx = 0, misWait = 0;
+let botCount = 15, lang = 'tr', soundOn = true, shake = 0, mis = null, misIdx = 0, misWait = 0;
 const save = { stars: 0 };
 let specials = [];
 const DIFFS = {
@@ -231,7 +238,8 @@ const rnd = (a, b) => a + Math.random() * (b - a);
 const wd = d => d > W / 2 ? d - W : (d < -W / 2 ? d + W : d);
 const wrap = v => v < 0 ? v + W : (v >= W ? v - W : v);
 const angDiff = (a, b) => { let d = (a - b) % TAU; if (d > Math.PI) d -= TAU; if (d < -Math.PI) d += TAU; return d; };
-const radiusOf = m => 9 + Math.min(16, Math.sqrt(m) * 1.05);
+const SEG_MAX = 600;
+const radiusOf = m => 9 + Math.min(16, Math.sqrt(m) * 1.05) + Math.min(40, Math.max(0, Math.sqrt(m) - 15.2) * 1.4);
 const $ = id => document.getElementById(id);
 
 const cv = $('c'), ctx = cv.getContext('2d');
@@ -267,7 +275,7 @@ function take(f, p, cell) {
   const o = p.o;
   const dbl = o.dblUntil > time ? 2 : 1;
   p.m += f.kind ? f.v : (f.dot ? f.v * 200 / (200 + p.m) * (finalOn ? 2 : 1) : f.v * 500 / (500 + p.m)) * dbl;
-  if (p.m > 1200) p.m = 1200; if (f.dot) cell.dots--;
+  if (f.dot) cell.dots--;
   f.gone = true;
   if (hosting()) netRem.push(f.id);
   if (!f.kind) return;
@@ -364,7 +372,7 @@ function eat(p, dt) {
 /* ---------- snakes ---------- */
 function makePiece(o, x, y, ang, m) {
   const p = { id: ++nextPid, parent: 0, o, xs: [], ys: [], m, ang, dash: 0, prot: 0, dead: false, r: radiusOf(m), d: radiusOf(m) * .5 };
-  const n = Math.floor(m);
+  const n = Math.min(SEG_MAX, Math.floor(m));
   for (let i = 0; i < n; i++) { p.xs.push(wrap(x - Math.cos(ang) * p.d * i)); p.ys.push(wrap(y - Math.sin(ang) * p.d * i)); }
   return p;
 }
@@ -376,7 +384,7 @@ function updatePiece(p, dt, tAng) {
   const sp = speedOf(p);
   if (p.dash > 0) p.dash -= dt;
   xs[0] = wrap(xs[0] + Math.cos(p.ang) * sp * dt); ys[0] = wrap(ys[0] + Math.sin(p.ang) * sp * dt);
-  const n = Math.max(2, Math.floor(p.m));
+  const n = Math.max(2, Math.min(SEG_MAX, Math.floor(p.m)));
   while (xs.length < n) { xs.push(xs[xs.length - 1]); ys.push(ys[ys.length - 1]); }
   while (xs.length > n) { xs.pop(); ys.pop(); }
   for (let i = 1; i < xs.length; i++) {
@@ -411,13 +419,15 @@ function newBot(o) {
 function mkHuman(h) {
   return { id: ++nextOid, name: h.name, ti: h.ti, type: TYPES[h.ti], deaths: 0, out: false, bot: false, pieces: [], splitCd: 0, seed: rnd(0, 9), tAng: 0, magUntil: 0, kills: 0, best: START_M, conn: h.conn || null, shield: false, ghostUntil: 0, slowUntil: 0, turboUntil: 0, dblUntil: 0, nGold: 0, nMag: 0, cdSpd: 0, cdMag: 0 };
 }
-function startWorld(humans, noBots) {
-  worldNoBots = !!noBots;
-  setMap(noBots ? 12 + 2 * Math.max(0, Math.min(6, humans.length) - 2) : 25);
+function startWorld(humans, nBots) {
+  if (nBots === undefined) nBots = 15;
+  worldNoBots = nBots === 0;
+  const N = (humans ? humans.length : 0) + nBots;
+  setMap(Math.min(50, Math.max(12, Math.round(12 + (N - 2) * 13 / 14))));
   owners = []; pieces = []; time = 0; resetFood(); parts = []; rings = []; floats = []; netFx = []; homing = [];
   player = null;
   for (const h of humans || []) { const o = mkHuman(h); h.o = o; owners.push(o); if (!h.conn) player = o; }
-  const nb = noBots ? 0 : Math.max(0, BOTS + 1 - owners.length);
+  const nb = nBots;
   for (let i = 0; i < nb; i++) { const o = { id: ++nextOid, pieces: [] }; owners.push(o); newBot(o); }
   for (const o of owners) spawn(o, o.bot ? rnd(DIFFS[diff].m[0], DIFFS[diff].m[1]) : START_M);
   roundOn = !!(humans && humans.length); roundLeft = ROUND_T; finalOn = false; speedUntil = 0; kingId = 0; lastKing = 0; evNext = rnd(20, 30);
@@ -949,7 +959,7 @@ const STR = {
     len: 'Boy', split: 'BÖL', bSpd: 'HIZ', bMag: 'MIKNATIS', hMag: 'Mıknatıs', hGho: 'Hayalet', hShd: 'Kalkan', hSlow: 'Yavaş',
     tMag: 'Mıknatıs!', tShd: 'Kalkan!', tGho: 'Hayalet!', tFrz: 'Dondurucu!', tSlow: 'Dondun!', tTur: 'Turbo!', tDbl: 'Çift yem!', hTur: 'Turbo', hDbl: 'x2 yem', tPlus: '+{0}', tAte: '{0} yem oldu!', tEaten: '{0} seni yedi', tDead: 'Yendin',
     tHalf: 'Yarın gitti!', tHit: 'Çarptın!', tBit: 'Kuyruğun koptu!', tShdBreak: 'Kalkan kırıldı!', tKing: 'Kralı yedin! +20',
-    evRain: 'Yem yağmuru!', evGold: 'Altın fırtınası!', evSpeed: 'Herkes hızlı!', evFinal: 'Son 30 saniye! Yemler çift sayılır.', evMag: 'Herkese mıknatıs!', botsOn: 'Botlar: Açık', botsOff: 'Botlar: Kapalı (botsuz mod)', need2: 'Botsuz oyun için en az 2 kişi gerekli.', spec: 'Elendin! Tur bitene kadar izliyorsun.', timeUp: 'SÜRE BİTTİ!', c2: 'ÇİFT!', c3: 'ÜÇLÜ!', c4: 'DURDURULAMAZ!', kingMe: 'Kral sensin!',
+    evRain: 'Yem yağmuru!', evGold: 'Altın fırtınası!', evSpeed: 'Herkes hızlı!', evFinal: 'Son 30 saniye! Yemler çift sayılır.', evMag: 'Herkese mıknatıs!', botsOn: 'Botlar: Açık', botsOff: 'Bot yok (botsuz mod)', botN: 'Bot sayısı: {0}', botWarn: '30 üstü bot eski telefonlarda kasabilir.', need2: 'Botsuz oyun için en az 2 kişi gerekli.', spec: 'Elendin! Tur bitene kadar izliyorsun.', timeUp: 'SÜRE BİTTİ!', c2: 'ÇİFT!', c3: 'ÜÇLÜ!', c4: 'DURDURULAMAZ!', kingMe: 'Kral sensin!',
     mis: 'Görev: {0}', mKills: '{0} yılan ye', mLen: '{0} boya ulaş', mGold: '{0} altın yem topla', mMag: '{0} mıknatıs topla', misDone: 'Görev tamam!', unlock: 'Yeni yılan açıldı: {0}', locked: 'Kilitli · {0} görev'
   },
   de: {
@@ -966,7 +976,7 @@ const STR = {
     len: 'Länge', split: 'TEIL', bSpd: 'TEMPO', bMag: 'MAGNET', hMag: 'Magnet', hGho: 'Geist', hShd: 'Schild', hSlow: 'Langsam',
     tMag: 'Magnet!', tShd: 'Schild!', tGho: 'Geist!', tFrz: 'Frost!', tSlow: 'Eingefroren!', tTur: 'Turbo!', tDbl: 'Doppeltes Futter!', hTur: 'Turbo', hDbl: 'x2 Futter', tPlus: '+{0}', tAte: '{0} gefressen!', tEaten: '{0} hat dich gefressen', tDead: 'Gefressen',
     tHalf: 'Hälfte verloren!', tHit: 'Aufprall!', tBit: 'Schwanz ab!', tShdBreak: 'Schild zerbrochen!', tKing: 'König gefressen! +20',
-    evRain: 'Futterregen!', evGold: 'Goldsturm!', evSpeed: 'Alle schnell!', evFinal: 'Letzte 30 Sekunden! Futter zählt doppelt.', evMag: 'Magnet für alle!', botsOn: 'Bots: An', botsOff: 'Bots: Aus (ohne Bots)', need2: 'Ohne Bots braucht ihr mindestens 2 Spieler.', spec: 'Ausgeschieden! Du schaust bis zum Rundenende zu.', timeUp: 'ZEIT UM!', c2: 'DOPPEL!', c3: 'DREIFACH!', c4: 'UNAUFHALTSAM!', kingMe: 'Du bist König!',
+    evRain: 'Futterregen!', evGold: 'Goldsturm!', evSpeed: 'Alle schnell!', evFinal: 'Letzte 30 Sekunden! Futter zählt doppelt.', evMag: 'Magnet für alle!', botsOn: 'Bots: An', botsOff: 'Keine Bots (ohne Bots)', botN: 'Bots: {0}', botWarn: 'Über 30 Bots kann ältere Handys ruckeln lassen.', need2: 'Ohne Bots braucht ihr mindestens 2 Spieler.', spec: 'Ausgeschieden! Du schaust bis zum Rundenende zu.', timeUp: 'ZEIT UM!', c2: 'DOPPEL!', c3: 'DREIFACH!', c4: 'UNAUFHALTSAM!', kingMe: 'Du bist König!',
     mis: 'Mission: {0}', mKills: 'Friss {0} Schlangen', mLen: 'Erreiche Länge {0}', mGold: 'Sammle {0} Goldfutter', mMag: 'Sammle {0} Magnete', misDone: 'Mission geschafft!', unlock: 'Neue Schlange frei: {0}', locked: 'Gesperrt · {0} Missionen'
   }
 };
@@ -974,8 +984,8 @@ function _t(k, a, b) { let v = (STR[lang] && STR[lang][k]) || STR.tr[k] || k; if
 const esc = v => (v + '').replace(/[&<>"']/g, c => '&#' + c.charCodeAt(0) + ';');
 const tname = i => lang === 'de' ? DE_NAMES[i] : TYPES[i].name;
 const isLocked = i => !!LOCKS[i] && save.stars < LOCKS[i];
-function persist() { try { localStorage.setItem('babaconda', JSON.stringify({ stars: save.stars, lang, soundOn })); } catch (e) {} }
-function loadSave() { try { const d = JSON.parse(localStorage.getItem('babaconda') || '{}'); save.stars = d.stars | 0; if (d.lang === 'de' || d.lang === 'tr') lang = d.lang; if (d.soundOn === false) soundOn = false; } catch (e) {} }
+function persist() { try { localStorage.setItem('babaconda', JSON.stringify({ stars: save.stars, lang, soundOn, botCount })); } catch (e) {} }
+function loadSave() { try { const d = JSON.parse(localStorage.getItem('babaconda') || '{}'); save.stars = d.stars | 0; if (d.lang === 'de' || d.lang === 'tr') lang = d.lang; if (d.soundOn === false) soundOn = false; if (d.botCount >= 1 && d.botCount <= 40) botCount = d.botCount | 0; } catch (e) {} }
 
 /* ---------- sound and voice ---------- */
 let actx = null;
@@ -1128,6 +1138,7 @@ function applyLang() {
   $('dInfo').textContent = _t({ easy: 'iEasy', normal: 'iNormal', hard: 'iHard' }[diff]);
   $('mStars').textContent = _t('stars', save.stars);
   $('split').textContent = _t('split');
+  drawBots();
   updatePickers();
 }
 function showOv(id) { for (const k of ['menu', 'join', 'room', 'over', 'podium']) $(k).classList.toggle('on', k === id); }
@@ -1145,7 +1156,7 @@ function gameOver() {
 }
 function myName() { const v = (($('name').value || '') + '').trim().slice(0, 10); return v || 'SEN'; }
 function enterPlay() { endSeq = null; conf = []; $('bigMsg').className = ''; $('hud').classList.remove('spec'); mode = 'play'; mis = null; misWait = 0; misIdx = save.stars; fxAlive = false; showOv(null); $('hud').classList.add('on'); hud(); }
-function play() { unlockAudio(); startWorld([{ name: myName(), ti: selType }]); enterPlay(); }
+function play() { unlockAudio(); startWorld([{ name: myName(), ti: selType }], Math.max(1, botCount)); enterPlay(); }
 function toMenu(msg) {
   leaveNet(); endSeq = null; conf = []; $('bigMsg').className = ''; mode = 'menu'; player = null; $('hud').classList.remove('on'); showOv('menu'); $('menuMsg').textContent = msg || ''; $('mStars').textContent = _t('stars', save.stars);
   startWorld(null);
@@ -1167,7 +1178,7 @@ function freeType(want, rid) {
 function sendTo(conn, m) { try { if (conn && conn.open) conn.send(m); } catch (e) {} }
 function castLobby() {
   const players = net.room.map(r => ({ id: r.id, name: r.name, ti: r.ti }));
-  for (const r of net.room) if (r.conn) sendTo(r.conn, { t: 'lobby', players, you: r.id, code: net.code, bots: net.bots });
+  for (const r of net.room) if (r.conn) sendTo(r.conn, { t: 'lobby', players, you: r.id, code: net.code, nBots: net.nBots });
   drawRoom();
 }
 function drawRoom() {
@@ -1176,8 +1187,9 @@ function drawRoom() {
   $('roomCode').textContent = net.code || '....';
   $('roomMsg').textContent = net.room.length ? _t('inRoom', net.room.map(r => r.name).join(', ')) + (net.role === 'host' ? '' : ' · ' + _t('waitStart')) : _t('connecting');
   $('startBtn').style.display = net.role === 'host' ? 'block' : 'none';
-  const bb = $('botBtn'); bb.textContent = _t(net.bots ? 'botsOn' : 'botsOff'); bb.style.opacity = net.role === 'host' ? '1' : '.6';
-  const need = !net.bots && net.room.length < 2; $('startBtn').style.opacity = need ? '.5' : '1';
+  $('rBotLbl').textContent = net.nBots ? _t('botN', net.nBots) : _t('botsOff'); $('rBotRow').style.opacity = net.role === 'host' ? '1' : '.6';
+  $('rBotWarn').textContent = net.nBots > 30 ? _t('botWarn') : '';
+  const need = !net.nBots && net.room.length < 2; $('startBtn').style.opacity = need ? '.5' : '1';
   if (need) $('roomMsg').textContent += ' · ' + _t('need2');
   rCards.forEach((b, i) => {
     const who = net.room.find(r => r.ti === i), lock = isLocked(i) && !who;
@@ -1206,7 +1218,7 @@ function hostMsg(r, m) {
 }
 function makeRoom() {
   if (typeof Peer === 'undefined') { $('menuMsg').textContent = _t('eNoNet'); return; }
-  unlockAudio(); leaveNet(); net.role = 'host'; net.myRid = 0; net.code = ''; net.bots = true;
+  unlockAudio(); leaveNet(); net.role = 'host'; net.myRid = 0; net.code = ''; net.nBots = botCount;
   net.room = [{ id: 0, name: myName(), ti: selType, conn: null }];
   mode = 'room'; showOv('room'); drawRoom(); $('roomMsg').textContent = _t('making');
   let rid = 0;
@@ -1238,8 +1250,8 @@ function makeRoom() {
 }
 function startRoom() {
   if (net.role !== 'host' || !net.code) return;
-  if (!net.bots && net.room.length < 2) { drawRoom(); return; }
-  startWorld(net.room, !net.bots);
+  if (!net.nBots && net.room.length < 2) { drawRoom(); return; }
+  startWorld(net.room, net.nBots);
   net.started = true; netAdd = []; netRem = [];
   const food = allFood();
   for (const r of net.room) if (r.conn) sendTo(r.conn, { t: 'start', you: r.o.id, food, gc: GC, nb: worldNoBots });
@@ -1274,7 +1286,7 @@ function clientMsg(m) {
   if (!m) return;
   if (m.t === 'full') { leaveNet(); $('joinMsg').textContent = _t('eFull'); }
   else if (m.t === 'lobby') {
-    net.room = m.players; net.myRid = m.you; net.bots = m.bots !== false;
+    net.room = m.players; net.myRid = m.you; net.nBots = m.nBots | 0;
     if (!net.started && mode !== 'room') { mode = 'room'; showOv('room'); }
     drawRoom();
   } else if (m.t === 'start') {
@@ -1386,7 +1398,13 @@ const DB = { easy: 'dEasy', normal: 'dNormal', hard: 'dHard' };
 for (const k in DB) $(DB[k]).addEventListener('click', () => { diff = k; for (const j in DB) $(DB[j]).classList.toggle('sel', j === k); applyLang(); });
 $('langBtn').addEventListener('click', () => { lang = lang === 'tr' ? 'de' : 'tr'; persist(); applyLang(); if (net.role) drawRoom(); });
 $('sndBtn').addEventListener('click', () => { soundOn = !soundOn; persist(); applyLang(); if (soundOn) { unlockAudio(); SFX.bonus(); } });
-$('botBtn').addEventListener('click', () => { if (net.role !== 'host' || net.started) return; net.bots = !net.bots; castLobby(); });
+const BSTEPS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20, 25, 30, 35, 40];
+const bstep = (v, d, min) => { let i = BSTEPS.indexOf(v); if (i < 0) i = BSTEPS.findIndex(x => x >= v); i = Math.max(BSTEPS.indexOf(min), Math.min(BSTEPS.length - 1, i + d)); return BSTEPS[i]; };
+function drawBots() { $('botLbl').textContent = _t('botN', botCount); $('botWarn').textContent = botCount > 30 ? _t('botWarn') : ''; }
+$('botMinus').addEventListener('click', () => { botCount = bstep(botCount, -1, 1); persist(); drawBots(); });
+$('botPlus').addEventListener('click', () => { botCount = bstep(botCount, 1, 1); persist(); drawBots(); });
+$('rBotMinus').addEventListener('click', () => { if (net.role !== 'host' || net.started) return; net.nBots = bstep(net.nBots, -1, 0); castLobby(); });
+$('rBotPlus').addEventListener('click', () => { if (net.role !== 'host' || net.started) return; net.nBots = bstep(net.nBots, 1, 0); castLobby(); });
 $('nextRound').addEventListener('click', () => { if (net.role === 'host') startRoom(); else if (!net.role) play(); });
 $('podMenu').addEventListener('click', () => toMenu(''));
 
@@ -1456,7 +1474,7 @@ function frame(now) {
     const k = Math.min(1, dt * 6);
     cam.x = wrap(cam.x + wd(f.xs[0] - cam.x) * k); cam.y = wrap(cam.y + wd(f.ys[0] - cam.y) * k);
     const base = Math.max(.8, Math.min(1.3, Math.min(vw, vh) / 460));
-    const tz = base * Math.max(.55, 1.05 - (f.r - 12) * .035) * (o.pieces.length > 1 ? .85 : 1);
+    const tz = base * Math.max(.32, 1.05 - (f.r - 12) * .03) * (o.pieces.length > 1 ? .85 : 1);
     cam.z += (tz - cam.z) * Math.min(1, dt * 2);
   }
   render();
