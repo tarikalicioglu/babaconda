@@ -93,7 +93,8 @@
   .tbtn.sel { border-color: #fff; box-shadow: 0 0 18px rgba(255,255,255,.5); }
   .brow span { flex: 1; font-weight: 800; font-size: 18px; }
   #botWarn, #rBotWarn { color: #ff8aa8; }
-  #diff, #opts { display: flex; gap: 8px; max-width: 420px; margin: 6px auto 0; }
+  #diff, #opts { display: flex; flex-wrap: wrap; gap: 8px; max-width: 420px; margin: 6px auto 0; }
+  #patBtn { flex-basis: 100%; }
   .dbtn { flex: 1; padding: 13px 0; border: 0; border-radius: 16px; font: 800 16px 'Outfit', sans-serif; color: #c7b8ff; background: transparent; box-shadow: inset 0 0 0 2px #7b66d6; }
   .dbtn.sel { color: #063326; background: linear-gradient(#7ef2c8, #2fc49a); box-shadow: 0 5px 0 #1c8a6c; }
   .num { font-weight: 800; font-size: 30px; color: #7ef2c8; }
@@ -135,6 +136,7 @@
   <div id="opts">
     <button class="dbtn" id="langBtn"></button>
     <button class="dbtn" id="sndBtn"></button>
+    <button class="dbtn" id="patBtn"></button>
   </div>
   <p id="mStars"></p>
   <p id="mHelp"></p>
@@ -157,6 +159,7 @@
   <div id="roomPicker" class="pickgrid"></div>
   <div class="brow" id="rBotRow"><button class="dbtn" id="rBotMinus">−</button><span id="rBotLbl"></span><button class="dbtn" id="rBotPlus">+</button></div>
   <p id="rBotWarn"></p>
+  <button class="big ghost" id="rPatBtn"></button>
   <button class="big ghost" id="teamBtn"></button>
   <div id="teamBox">
     <p id="teamPickL"></p>
@@ -781,7 +784,15 @@ function drawHead(c, T, t, seed) {
 }
 const MAXN = 4000, P = new Float32Array(MAXN * 2), RR = new Float32Array(MAXN), VIS = new Uint8Array(MAXN);
 // P holds camera-relative coords, index 0 = head
-function drawBody(c, T, n, r, ang, t, seed) {
+let plainWorld = false, plainPref = false;
+function shade(h, f) { const v = parseInt(h.slice(1), 16), ch = k => { const x = (v >> k) & 255; return Math.round(f > 0 ? x + (255 - x) * f : x * (1 + f)); }; return 'rgb(' + ch(16) + ',' + ch(8) + ',' + ch(0) + ')'; }
+const ttCache = {};
+function teamType(t) {
+  const col = teamCol(t);
+  if (!ttCache[col]) { const b = TYPES[0]; ttCache[col] = Object.assign({}, b, { c: col, hi: shade(col, .55), lo: shade(col, -.55), p: shade(col, -.55), p2: shade(col, .55), eye: '#ffffff', tongue: '#ff3b5c', head: 'viper', fangs: 1, rattle: 0, hood: 0, frill: 0, horns: 0, spikes: 0, twin: 0 }); }
+  return ttCache[col];
+}
+function drawBody(c, T, n, r, ang, t, seed, noPat) {
   const taper = Math.max(3, n * .3);
   for (let i = 0; i < n; i++) { const k = n - 1 - i; RR[i] = k < taper ? r * (.28 + .72 * k / taper) : r; }
   let i, x, y, R;
@@ -810,6 +821,7 @@ function drawBody(c, T, n, r, ang, t, seed) {
   c.fillStyle = T.c; c.beginPath();
   for (i = n - 1; i >= 0; i--) if (VIS[i]) { R = RR[i]; x = P[2 * i]; y = P[2 * i + 1] - R * .14; c.moveTo(x + R * .9, y); c.arc(x, y, R * .9, 0, TAU); }
   c.fill();
+  if (!noPat) {
   // pattern
   const pt = T.pattern;
   for (let pass = 0; pass < 2; pass++) {
@@ -847,6 +859,7 @@ function drawBody(c, T, n, r, ang, t, seed) {
     if (pt === 'lava' && !pass) { c.lineWidth = r * .2; c.lineCap = 'round'; c.lineJoin = 'round'; c.stroke(); }
     else { c.fill(); if (pt === 'bone') { c.lineWidth = r * .13; c.lineCap = 'round'; c.stroke(); } }
   }
+  }
   // gloss
   c.fillStyle = 'rgba(255,255,255,.42)'; c.beginPath();
   for (i = n - 1; i >= 1; i--) if (VIS[i]) { R = RR[i]; if (R < 3.5) continue; x = P[2 * i]; y = P[2 * i + 1] - R * .54; c.moveTo(x + R * .17, y); c.arc(x, y, R * .17, 0, TAU); }
@@ -861,7 +874,7 @@ function drawBody(c, T, n, r, ang, t, seed) {
   c.restore();
 }
 function drawPiece(p, hw, hh) {
-  const n = Math.min(p.xs.length, MAXN), T = p.o.type, m = p.r * 2.2 + 30;
+  const n = Math.min(p.xs.length, MAXN), T = plainWorld && worldTeams && p.o.team >= 0 ? teamType(p.o.team) : p.o.type, m = p.r * 2.2 + 30;
   let any = false;
   for (let i = 0; i < n; i++) {
     const x = wd(p.xs[i] - cam.x), y = wd(p.ys[i] - cam.y);
@@ -871,7 +884,7 @@ function drawPiece(p, hw, hh) {
   if (!any) return;
   const prot = p.prot > time;
   ctx.globalAlpha = p.o.ghostUntil > time ? .35 : (prot ? .45 + .25 * Math.sin(time * 14) : 1);
-  drawBody(ctx, T, n, p.r, p.ang, time, p.o.seed);
+  drawBody(ctx, T, n, p.r, p.ang, time, p.o.seed, plainWorld);
   if (p.o.slowUntil > time) { ctx.fillStyle = 'rgba(175,235,255,.5)'; ctx.beginPath(); for (let i = 0; i < n; i += 2) if (VIS[i]) { ctx.moveTo(P[2 * i] + p.r, P[2 * i + 1]); ctx.arc(P[2 * i], P[2 * i + 1], p.r, 0, TAU); } ctx.fill(); }
   ctx.globalAlpha = 1;
   if (VIS[0] && p.o.magUntil > time) {
@@ -982,7 +995,7 @@ const STR = {
     len: 'Boy', split: 'BÖL', bSpd: 'HIZ', bMag: 'MIKNATIS', hMag: 'Mıknatıs', hGho: 'Hayalet', hShd: 'Kalkan', hSlow: 'Yavaş',
     tMag: 'Mıknatıs!', tShd: 'Kalkan!', tGho: 'Hayalet!', tFrz: 'Dondurucu!', tSlow: 'Dondun!', tTur: 'Turbo!', tDbl: 'Çift yem!', hTur: 'Turbo', hDbl: 'x2 yem', tPlus: '+{0}', tAte: '{0} yem oldu!', tEaten: '{0} seni yedi', tDead: 'Yendin',
     tHalf: 'Yarın gitti!', tHit: 'Çarptın!', tBit: 'Kuyruğun koptu!', tShdBreak: 'Kalkan kırıldı!', tKing: 'Kralı yedin! +20',
-    evRain: 'Yem yağmuru!', evGold: 'Altın fırtınası!', evSpeed: 'Herkes hızlı!', evFinal: 'Son 30 saniye! Yemler çift sayılır.', evMag: 'Herkese mıknatıs!', botsOn: 'Botlar: Açık', botsOff: 'Bot yok (botsuz mod)', botN: 'Bot sayısı: {0}', teamOn: 'Takım savaşı: Açık', teamOff: 'Takım savaşı: Kapalı', teamPick: 'Takımını seç:', tColor: 'Renk:', tWin: 'Kazanan: {0} takım!', botWarn: '30 üstü bot eski telefonlarda kasabilir.', need2: 'Botsuz oyun için en az 2 kişi gerekli.', spec: 'Elendin! Tur bitene kadar izliyorsun.', timeUp: 'SÜRE BİTTİ!', c2: 'ÇİFT!', c3: 'ÜÇLÜ!', c4: 'DURDURULAMAZ!', kingMe: 'Kral sensin!',
+    evRain: 'Yem yağmuru!', evGold: 'Altın fırtınası!', evSpeed: 'Herkes hızlı!', evFinal: 'Son 30 saniye! Yemler çift sayılır.', evMag: 'Herkese mıknatıs!', botsOn: 'Botlar: Açık', botsOff: 'Bot yok (botsuz mod)', botN: 'Bot sayısı: {0}', patOn: 'Desen: Açık', patOff: 'Desen: Kapalı (düz renk)', teamOn: 'Takım savaşı: Açık', teamOff: 'Takım savaşı: Kapalı', teamPick: 'Takımını seç:', tColor: 'Renk:', tWin: 'Kazanan: {0} takım!', botWarn: '30 üstü bot eski telefonlarda kasabilir.', need2: 'Botsuz oyun için en az 2 kişi gerekli.', spec: 'Elendin! Tur bitene kadar izliyorsun.', timeUp: 'SÜRE BİTTİ!', c2: 'ÇİFT!', c3: 'ÜÇLÜ!', c4: 'DURDURULAMAZ!', kingMe: 'Kral sensin!',
     mis: 'Görev: {0}', mKills: '{0} yılan ye', mLen: '{0} boya ulaş', mGold: '{0} altın yem topla', mMag: '{0} mıknatıs topla', misDone: 'Görev tamam!', unlock: 'Yeni yılan açıldı: {0}', locked: 'Kilitli · {0} görev'
   },
   de: {
@@ -999,7 +1012,7 @@ const STR = {
     len: 'Länge', split: 'TEIL', bSpd: 'TEMPO', bMag: 'MAGNET', hMag: 'Magnet', hGho: 'Geist', hShd: 'Schild', hSlow: 'Langsam',
     tMag: 'Magnet!', tShd: 'Schild!', tGho: 'Geist!', tFrz: 'Frost!', tSlow: 'Eingefroren!', tTur: 'Turbo!', tDbl: 'Doppeltes Futter!', hTur: 'Turbo', hDbl: 'x2 Futter', tPlus: '+{0}', tAte: '{0} gefressen!', tEaten: '{0} hat dich gefressen', tDead: 'Gefressen',
     tHalf: 'Hälfte verloren!', tHit: 'Aufprall!', tBit: 'Schwanz ab!', tShdBreak: 'Schild zerbrochen!', tKing: 'König gefressen! +20',
-    evRain: 'Futterregen!', evGold: 'Goldsturm!', evSpeed: 'Alle schnell!', evFinal: 'Letzte 30 Sekunden! Futter zählt doppelt.', evMag: 'Magnet für alle!', botsOn: 'Bots: An', botsOff: 'Keine Bots (ohne Bots)', botN: 'Bots: {0}', teamOn: 'Teamkampf: An', teamOff: 'Teamkampf: Aus', teamPick: 'Wähle dein Team:', tColor: 'Farbe:', tWin: 'Sieger: Team {0}!', botWarn: 'Über 30 Bots kann ältere Handys ruckeln lassen.', need2: 'Ohne Bots braucht ihr mindestens 2 Spieler.', spec: 'Ausgeschieden! Du schaust bis zum Rundenende zu.', timeUp: 'ZEIT UM!', c2: 'DOPPEL!', c3: 'DREIFACH!', c4: 'UNAUFHALTSAM!', kingMe: 'Du bist König!',
+    evRain: 'Futterregen!', evGold: 'Goldsturm!', evSpeed: 'Alle schnell!', evFinal: 'Letzte 30 Sekunden! Futter zählt doppelt.', evMag: 'Magnet für alle!', botsOn: 'Bots: An', botsOff: 'Keine Bots (ohne Bots)', botN: 'Bots: {0}', patOn: 'Muster: An', patOff: 'Muster: Aus (einfarbig)', teamOn: 'Teamkampf: An', teamOff: 'Teamkampf: Aus', teamPick: 'Wähle dein Team:', tColor: 'Farbe:', tWin: 'Sieger: Team {0}!', botWarn: 'Über 30 Bots kann ältere Handys ruckeln lassen.', need2: 'Ohne Bots braucht ihr mindestens 2 Spieler.', spec: 'Ausgeschieden! Du schaust bis zum Rundenende zu.', timeUp: 'ZEIT UM!', c2: 'DOPPEL!', c3: 'DREIFACH!', c4: 'UNAUFHALTSAM!', kingMe: 'Du bist König!',
     mis: 'Mission: {0}', mKills: 'Friss {0} Schlangen', mLen: 'Erreiche Länge {0}', mGold: 'Sammle {0} Goldfutter', mMag: 'Sammle {0} Magnete', misDone: 'Mission geschafft!', unlock: 'Neue Schlange frei: {0}', locked: 'Gesperrt · {0} Missionen'
   }
 };
@@ -1007,8 +1020,8 @@ function _t(k, a, b) { let v = (STR[lang] && STR[lang][k]) || STR.tr[k] || k; if
 const esc = v => (v + '').replace(/[&<>"']/g, c => '&#' + c.charCodeAt(0) + ';');
 const tname = i => lang === 'de' ? DE_NAMES[i] : TYPES[i].name;
 const isLocked = i => !!LOCKS[i] && save.stars < LOCKS[i];
-function persist() { try { localStorage.setItem('babaconda', JSON.stringify({ stars: save.stars, lang, soundOn, botCount })); } catch (e) {} }
-function loadSave() { try { const d = JSON.parse(localStorage.getItem('babaconda') || '{}'); save.stars = d.stars | 0; if (d.lang === 'de' || d.lang === 'tr') lang = d.lang; if (d.soundOn === false) soundOn = false; if (d.botCount >= 1 && d.botCount <= 40) botCount = d.botCount | 0; } catch (e) {} }
+function persist() { try { localStorage.setItem('babaconda', JSON.stringify({ stars: save.stars, lang, soundOn, botCount, plain: plainPref })); } catch (e) {} }
+function loadSave() { try { const d = JSON.parse(localStorage.getItem('babaconda') || '{}'); save.stars = d.stars | 0; if (d.lang === 'de' || d.lang === 'tr') lang = d.lang; if (d.soundOn === false) soundOn = false; if (d.botCount >= 1 && d.botCount <= 40) botCount = d.botCount | 0; plainPref = d.plain === true; } catch (e) {} }
 
 /* ---------- sound and voice ---------- */
 let actx = null;
@@ -1161,7 +1174,7 @@ function showPodium(top, myId, tr) {
 function applyLang() {
   const set = (id, k) => { $(id).textContent = _t(k); };
   set('mPick', 'pick'); set('dEasy', 'easy'); set('dNormal', 'normal'); set('dHard', 'hard'); set('play', 'play'); set('mkRoom', 'mk'); set('joinRoom', 'join');
-  set('langBtn', 'lang'); $('sndBtn').textContent = _t(soundOn ? 'sndOn' : 'sndOff'); set('mHelp', 'help'); set('mHelp2', 'help2');
+  set('langBtn', 'lang'); $('sndBtn').textContent = _t(soundOn ? 'sndOn' : 'sndOff'); $('patBtn').textContent = _t(plainPref ? 'patOff' : 'patOn'); set('mHelp', 'help'); set('mHelp2', 'help2');
   set('jTitle', 'jTitle'); set('jInfo', 'jInfo'); set('joinGo', 'joinGo'); set('joinBack', 'back'); set('rLabel', 'rLabel'); set('startBtn', 'start'); set('leaveBtn', 'leave');
   set('oTitle', 'oTitle'); set('oSub', 'oSub'); set('oBestL', 'oBest'); set('oKillsL', 'oKills'); set('pTitle', 'pTitle'); set('nextRound', 'next'); set('podMenu', 'menu'); set('lenL', 'len');
   $('name').placeholder = _t('name'); $('code').placeholder = _t('codePh');
@@ -1186,10 +1199,10 @@ function gameOver() {
 }
 function myName() { const v = (($('name').value || '') + '').trim().slice(0, 10); return v || 'SEN'; }
 function enterPlay() { endSeq = null; conf = []; $('bigMsg').className = ''; $('hud').classList.remove('spec'); mode = 'play'; mis = null; misWait = 0; misIdx = save.stars; fxAlive = false; showOv(null); $('hud').classList.add('on'); hud(); }
-function play() { unlockAudio(); startWorld([{ name: myName(), ti: selType }], Math.max(1, botCount), false); enterPlay(); }
+function play() { unlockAudio(); startWorld([{ name: myName(), ti: selType }], Math.max(1, botCount), false); plainWorld = plainPref; enterPlay(); }
 function toMenu(msg) {
   leaveNet(); endSeq = null; conf = []; $('bigMsg').className = ''; mode = 'menu'; player = null; $('hud').classList.remove('on'); showOv('menu'); $('menuMsg').textContent = msg || ''; $('mStars').textContent = _t('stars', save.stars);
-  startWorld(null, 15, false);
+  startWorld(null, 15, false); plainWorld = plainPref;
 }
 
 /* ---------- multiplayer ---------- */
@@ -1208,7 +1221,7 @@ function freeType(want, rid) {
 function sendTo(conn, m) { try { if (conn && conn.open) conn.send(m); } catch (e) {} }
 function castLobby() {
   const players = net.room.map(r => ({ id: r.id, name: r.name, ti: r.ti, team: r.team | 0 }));
-  for (const r of net.room) if (r.conn) sendTo(r.conn, { t: 'lobby', players, you: r.id, code: net.code, nBots: net.nBots, teams: net.teams, tcol: net.tcol });
+  for (const r of net.room) if (r.conn) sendTo(r.conn, { t: 'lobby', players, you: r.id, code: net.code, nBots: net.nBots, teams: net.teams, tcol: net.tcol, plain: net.plain });
   drawRoom();
 }
 function drawRoom() {
@@ -1222,6 +1235,7 @@ function drawRoom() {
   const need = !net.nBots && net.room.length < 2; $('startBtn').style.opacity = need ? '.5' : '1';
   if (need) $('roomMsg').textContent += ' · ' + _t('need2');
   const host = net.role === 'host';
+  $('rPatBtn').textContent = _t(net.plain ? 'patOff' : 'patOn'); $('rPatBtn').style.opacity = host ? '1' : '.6';
   $('teamBtn').textContent = _t(net.teams ? 'teamOn' : 'teamOff'); $('teamBtn').style.opacity = host ? '1' : '.6';
   $('teamBox').style.display = net.teams ? 'block' : 'none'; $('tColRow').style.display = host ? 'flex' : 'none';
   $('teamPickL').textContent = _t('teamPick');
@@ -1242,7 +1256,7 @@ function allFood() { const a = []; for (const c of cells) for (const f of c.item
 function hostAdmit(r) {
   if (worldTeams && r.team === undefined) r.team = smallTeam(null);
   const o = mkHuman(r); r.o = o; owners.push(o); spawn(o);
-  sendTo(r.conn, { t: 'start', you: o.id, food: allFood(), gc: GC, nb: worldNoBots, tm: worldTeams, tc: worldTcol });
+  sendTo(r.conn, { t: 'start', you: o.id, food: allFood(), gc: GC, nb: worldNoBots, tm: worldTeams, tc: worldTcol, pl: plainWorld });
 }
 function hostDrop(r) {
   net.room = net.room.filter(q => q !== r);
@@ -1261,7 +1275,7 @@ function hostMsg(r, m) {
 }
 function makeRoom() {
   if (typeof Peer === 'undefined') { $('menuMsg').textContent = _t('eNoNet'); return; }
-  unlockAudio(); leaveNet(); net.role = 'host'; net.myRid = 0; net.code = ''; net.nBots = botCount; net.teams = false; net.tcol = [0, 1];
+  unlockAudio(); leaveNet(); net.role = 'host'; net.myRid = 0; net.code = ''; net.nBots = botCount; net.teams = false; net.tcol = [0, 1]; net.plain = plainPref;
   net.room = [{ id: 0, name: myName(), ti: selType, conn: null }];
   mode = 'room'; showOv('room'); drawRoom(); $('roomMsg').textContent = _t('making');
   let rid = 0;
@@ -1294,10 +1308,10 @@ function makeRoom() {
 function startRoom() {
   if (net.role !== 'host' || !net.code) return;
   if (!net.nBots && net.room.length < 2) { drawRoom(); return; }
-  startWorld(net.room, net.nBots, net.teams, net.tcol);
+  startWorld(net.room, net.nBots, net.teams, net.tcol); plainWorld = !!net.plain;
   net.started = true; netAdd = []; netRem = [];
   const food = allFood();
-  for (const r of net.room) if (r.conn) sendTo(r.conn, { t: 'start', you: r.o.id, food, gc: GC, nb: worldNoBots, tm: worldTeams, tc: worldTcol });
+  for (const r of net.room) if (r.conn) sendTo(r.conn, { t: 'start', you: r.o.id, food, gc: GC, nb: worldNoBots, tm: worldTeams, tc: worldTcol, pl: plainWorld });
   enterPlay();
 }
 const r1 = v => Math.round(v * 10) / 10, r3 = v => Math.round(v * 1000) / 1000;
@@ -1329,11 +1343,11 @@ function clientMsg(m) {
   if (!m) return;
   if (m.t === 'full') { leaveNet(); $('joinMsg').textContent = _t('eFull'); }
   else if (m.t === 'lobby') {
-    net.room = m.players; net.myRid = m.you; net.nBots = m.nBots | 0; net.teams = !!m.teams; net.tcol = m.tcol || [0, 1];
+    net.room = m.players; net.myRid = m.you; net.nBots = m.nBots | 0; net.teams = !!m.teams; net.tcol = m.tcol || [0, 1]; net.plain = !!m.plain;
     if (!net.started && mode !== 'room') { mode = 'room'; showOv('room'); }
     drawRoom();
   } else if (m.t === 'start') {
-    setMap(m.gc || 25); worldNoBots = !!m.nb; worldTeams = !!m.tm; if (m.tc) worldTcol = m.tc;
+    setMap(m.gc || 25); worldNoBots = !!m.nb; worldTeams = !!m.tm; if (m.tc) worldTcol = m.tc; plainWorld = !!m.pl;
     owners = []; pieces = []; player = null; time = 0; specials = []; homing = []; parts = []; rings = []; floats = [];
     ownById.clear(); pcById.clear(); foodById.clear();
     cells = []; for (let i = 0; i < GC * GC; i++) cells.push({ items: [], dots: 0 });
@@ -1446,6 +1460,8 @@ const bstep = (v, d, min) => { let i = BSTEPS.indexOf(v); if (i < 0) i = BSTEPS.
 function drawBots() { $('botLbl').textContent = _t('botN', botCount); $('botWarn').textContent = botCount > 30 ? _t('botWarn') : ''; }
 $('botMinus').addEventListener('click', () => { botCount = bstep(botCount, -1, 1); persist(); drawBots(); });
 $('botPlus').addEventListener('click', () => { botCount = bstep(botCount, 1, 1); persist(); drawBots(); });
+$('patBtn').addEventListener('click', () => { plainPref = !plainPref; if (mode === 'menu') plainWorld = plainPref; persist(); applyLang(); });
+$('rPatBtn').addEventListener('click', () => { if (net.role !== 'host' || net.started) return; net.plain = !net.plain; castLobby(); });
 $('teamBtn').addEventListener('click', () => { if (net.role !== 'host' || net.started) return; net.teams = !net.teams; castLobby(); });
 ['tA', 'tB'].forEach((id, t) => $(id).addEventListener('click', () => {
   if (net.started) return;
@@ -1534,7 +1550,7 @@ function frame(now) {
   hudT -= dt; if (hudT <= 0) { hudT = .25; if (mode === 'play' || mode === 'spec') hud(); else if (toastT && time > toastT) { $('toast').classList.remove('on'); toastT = 0; } }
   requestAnimationFrame(frame);
 }
-loadSave(); applyLang();
+loadSave(); plainWorld = plainPref; applyLang();
 startWorld(null);
 requestAnimationFrame(frame);
 })();
