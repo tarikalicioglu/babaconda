@@ -48,7 +48,8 @@
   #bigCount { position: absolute; top: 36%; left: 0; right: 0; text-align: center; font-weight: 800; font-size: 120px; color: rgba(255,95,176,.95); text-shadow: 0 8px 0 #5b3fb0; opacity: 0; }
   #bigCount.beat { animation: beat .95s ease-out forwards; }
   @keyframes beat { 0% { transform: scale(1.7); opacity: 1; } 100% { transform: scale(1); opacity: .12; } }
-  #specBar { position: absolute; top: 46px; left: 50%; transform: translateX(-50%); padding: 6px 14px; border-radius: 14px; font-weight: 800; font-size: 13px; background: rgba(224,51,95,.85); white-space: nowrap; display: none; }
+  #teamBar { position: absolute; top: 40px; left: 0; right: 0; text-align: center; font-weight: 800; font-size: 15px; text-shadow: 0 2px 0 #17103a; }
+  #specBar { position: absolute; top: 66px; left: 50%; transform: translateX(-50%); padding: 6px 14px; border-radius: 14px; font-weight: 800; font-size: 13px; background: rgba(224,51,95,.85); white-space: nowrap; display: none; }
   #hud.spec #specBar { display: block; }
   #hud.spec #split, #hud.spec .bst { display: none; }
   #bigMsg { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; font-weight: 800; font-size: 54px; color: #ffd166; text-shadow: 0 6px 0 #9a6a10, 0 0 40px rgba(255,209,102,.6); opacity: 0; }
@@ -87,6 +88,9 @@
   .ghost[disabled] { opacity: .55; }
   .brow { display: flex; align-items: center; gap: 10px; max-width: 420px; margin: 10px auto 0; }
   .brow .dbtn { flex: 0 0 60px; font-size: 24px; }
+  #tColRow .dbtn { flex: 1; font-size: 14px; }
+  .tbtn { flex: 1; padding: 14px 4px; border: 3px solid transparent; border-radius: 16px; font: 800 15px 'Outfit', sans-serif; color: #17103a; }
+  .tbtn.sel { border-color: #fff; box-shadow: 0 0 18px rgba(255,255,255,.5); }
   .brow span { flex: 1; font-weight: 800; font-size: 18px; }
   #botWarn, #rBotWarn { color: #ff8aa8; }
   #diff, #opts { display: flex; gap: 8px; max-width: 420px; margin: 6px auto 0; }
@@ -101,6 +105,7 @@
 <div id="hud">
   <div id="stat"><span id="lenL"></span> <span id="len">10</span><div id="lives"></div><div id="mag"></div><div id="mis"></div></div>
   <div id="timer"></div>
+  <div id="teamBar"></div>
   <div id="board"></div>
   <div id="toast"></div>
   <div id="bigCount"></div>
@@ -152,6 +157,12 @@
   <div id="roomPicker" class="pickgrid"></div>
   <div class="brow" id="rBotRow"><button class="dbtn" id="rBotMinus">−</button><span id="rBotLbl"></span><button class="dbtn" id="rBotPlus">+</button></div>
   <p id="rBotWarn"></p>
+  <button class="big ghost" id="teamBtn"></button>
+  <div id="teamBox">
+    <p id="teamPickL"></p>
+    <div class="brow"><button class="tbtn" id="tA"></button><button class="tbtn" id="tB"></button></div>
+    <div class="brow" id="tColRow"><button class="dbtn" id="tColA"></button><button class="dbtn" id="tColB"></button></div>
+  </div>
   <button class="big" id="startBtn"></button>
   <button class="big ghost" id="leaveBtn"></button>
 </div>
@@ -172,6 +183,7 @@
     <div class="pcol" id="pc0"><canvas id="pk0" width="320" height="208"></canvas><b id="pn0"></b><span id="pl0"></span><div class="pbar">1</div></div>
     <div class="pcol" id="pc2"><canvas id="pk2" width="320" height="208"></canvas><b id="pn2"></b><span id="pl2"></span><div class="pbar">3</div></div>
   </div>
+  <p id="pTeam" class="num"></p>
   <div id="pList"></div>
   <p id="pMe"></p>
   <p id="pWait"></p>
@@ -218,9 +230,15 @@ const specN = k => Math.max(k === 'g50' ? 1 : 2, Math.round(SPEC[k].n * GC * GC 
 const BOTS = 15, LIVES = 3, START_M = 10, SPLIT_MIN = 16, EQ = 3;
 const MAG_R = 260, MAG_T = 8, HIT_PROT = 3;
 const SPEC = { g10: { n: 6, v: 10, r: 11, w: 10 }, g50: { n: 1, v: 50, r: 17, w: 50 }, mag: { n: 6, v: 0, r: 13, w: 8 },
-  shd: { n: 3, v: 0, r: 13, w: 6 }, gho: { n: 3, v: 0, r: 13, w: 5 }, frz: { n: 3, v: 0, r: 13, w: 5 },
+  shd: { n: 3, v: 0, r: 13, w: 6 }, gho: { n: 3, v: 0, r: 13, w: 5 },
   tur: { n: 3, v: 0, r: 13, w: 6 }, dbl: { n: 3, v: 0, r: 13, w: 6 } };
 const ROUND_T = 180, FINAL_T = 30, BOOST_CD = 10;
+const TCOLS = [['Kırmızı', 'Rot', '#ff3b5c'], ['Mavi', 'Blau', '#3b8bff'], ['Sarı', 'Gelb', '#ffd23f'], ['Yeşil', 'Grün', '#39d353'], ['Mor', 'Lila', '#b45cff'], ['Turuncu', 'Orange', '#ff8a1a'], ['Lacivert', 'Navy', '#2a4cc9'], ['Beyaz', 'Weiß', '#f2f2f2']];
+let worldTeams = false, worldTcol = [0, 1];
+const tcName = i => TCOLS[i][lang === 'de' ? 1 : 0];
+const teamCol = t => TCOLS[worldTcol[t] | 0][2];
+const same = (a, b) => worldTeams && a.team >= 0 && a.team === b.team;
+function smallTeam(skip) { const c = [0, 0]; for (const q of owners) if (q !== skip && q.team >= 0) c[q.team]++; return c[0] <= c[1] ? 0 : 1; }
 const DE_NAMES = ['Gift', 'Schwarze Kobra', 'Lava', 'Hydra', 'Skelett', 'Goldener Drache', 'Eisstachel', 'Koralle', 'Alex', 'Lefter', 'Hagi', 'Metin Oktay', 'Sergen', 'Feyyaz', 'Şenol', 'Hami', 'Hakan Kutlu', 'Batalla', 'Višća', 'Fevzi Zemzem'];
 const LOCKS = {};
 const MISSIONS = [['kills', 2], ['len', 80], ['gold', 2], ['mag', 2], ['kills', 3], ['len', 150], ['gold', 4], ['len', 250], ['kills', 5]];
@@ -238,7 +256,7 @@ const rnd = (a, b) => a + Math.random() * (b - a);
 const wd = d => d > W / 2 ? d - W : (d < -W / 2 ? d + W : d);
 const wrap = v => v < 0 ? v + W : (v >= W ? v - W : v);
 const angDiff = (a, b) => { let d = (a - b) % TAU; if (d > Math.PI) d -= TAU; if (d < -Math.PI) d += TAU; return d; };
-const SEG_MAX = 600;
+const SEG_MAX = 300;
 const radiusOf = m => 9 + Math.min(16, Math.sqrt(m) * 1.05) + Math.min(40, Math.max(0, Math.sqrt(m) - 15.2) * 1.4);
 const $ = id => document.getElementById(id);
 
@@ -287,7 +305,7 @@ function take(f, p, cell) {
   else if (f.kind === 'frz') {
     for (const q of owners) { const h = q.pieces[0]; if (q !== o && h && Math.hypot(wd(h.xs[0] - p.xs[0]), wd(h.ys[0] - p.ys[0])) < 900) { q.slowUntil = time + 4; toastFor(q, 'tSlow'); } }
     toastFor(o, 'tFrz');
-  } else if (f.kind === 'tur') { o.turboUntil = time + 6; toastFor(o, 'tTur'); }
+  } else if (f.kind === 'tur') { addTurbo(o, 6); toastFor(o, 'tTur'); }
   else if (f.kind === 'dbl') { o.dblUntil = time + 15; toastFor(o, 'tDbl'); }
   else { o.nGold = (o.nGold | 0) + 1; toastFor(o, 'tPlus', f.v * dbl); }
 }
@@ -371,14 +389,15 @@ function eat(p, dt) {
 
 /* ---------- snakes ---------- */
 function makePiece(o, x, y, ang, m) {
-  const p = { id: ++nextPid, parent: 0, o, xs: [], ys: [], m, ang, dash: 0, prot: 0, dead: false, r: radiusOf(m), d: radiusOf(m) * .5 };
+  const p = { id: ++nextPid, parent: 0, o, xs: [], ys: [], m, ang, dash: 0, prot: 0, dead: false, r: radiusOf(m), d: Math.min(8, radiusOf(m) * .5) };
   const n = Math.min(SEG_MAX, Math.floor(m));
   for (let i = 0; i < n; i++) { p.xs.push(wrap(x - Math.cos(ang) * p.d * i)); p.ys.push(wrap(y - Math.sin(ang) * p.d * i)); }
   return p;
 }
-function speedOf(p) { let sp = Math.max(75, 210 / (1 + p.m / 150)); if (p.dash > 0) sp *= 2.6; if (p.o.slowUntil > time) sp *= .2; if (p.o.turboUntil > time) sp *= 1.7; if (speedUntil > time) sp *= 1.5; return sp; }
+function addTurbo(o, dur) { o.turboLv = Math.min(5, (o.turboUntil > time ? o.turboLv | 0 : 0) + 1); o.turboUntil = Math.max(o.turboUntil, time + dur); }
+function speedOf(p) { let sp = Math.max(75, 210 / (1 + p.m / 150)); if (p.dash > 0) sp *= 2.6; if (p.o.slowUntil > time) sp *= .2; if (p.o.turboUntil > time) sp *= 1 + .4 * Math.max(1, p.o.turboLv | 0); if (speedUntil > time) sp *= 1.5; return sp; }
 function updatePiece(p, dt, tAng) {
-  const r = p.r = radiusOf(p.m), d = p.d = r * .5, xs = p.xs, ys = p.ys;
+  const r = p.r = radiusOf(p.m), d = p.d = Math.min(8, r * .5), xs = p.xs, ys = p.ys;
   const turn = 4.2 / (1 + p.m / 400) * dt, df = angDiff(tAng, p.ang);
   p.ang += Math.max(-turn, Math.min(turn, df));
   const sp = speedOf(p);
@@ -414,13 +433,14 @@ function newBot(o) {
   const taken = new Set(owners.filter(q => q.bot === false).map(q => q.ti));
   let t; do { t = (Math.random() * TYPES.length) | 0; } while (taken.has(t));
   o.name = free[(Math.random() * free.length) | 0] || 'Yılan'; o.ti = t; o.type = TYPES[t];
-  o.deaths = 0; o.out = false; o.bot = true; o.magUntil = 0; o.kills = 0; o.best = 0; o.shield = false; o.ghostUntil = 0; o.slowUntil = 0; o.turboUntil = 0; o.dblUntil = 0; o.cdSpd = 0; o.cdMag = 0; o.nGold = 0; o.nMag = 0; o.think = rnd(0, .2); o.splitCd = 0; o.seed = rnd(0, 9);
+  o.deaths = 0; o.out = false; o.bot = true; o.magUntil = 0; o.kills = 0; o.best = 0; o.shield = false; o.ghostUntil = 0; o.slowUntil = 0; o.turboUntil = 0; o.dblUntil = 0; o.cdSpd = 0; o.cdMag = 0; o.nGold = 0; o.nMag = 0; o.think = rnd(0, .2); o.splitCd = 0; o.seed = rnd(0, 9); o.team = worldTeams ? smallTeam(o) : -1;
 }
 function mkHuman(h) {
-  return { id: ++nextOid, name: h.name, ti: h.ti, type: TYPES[h.ti], deaths: 0, out: false, bot: false, pieces: [], splitCd: 0, seed: rnd(0, 9), tAng: 0, magUntil: 0, kills: 0, best: START_M, conn: h.conn || null, shield: false, ghostUntil: 0, slowUntil: 0, turboUntil: 0, dblUntil: 0, nGold: 0, nMag: 0, cdSpd: 0, cdMag: 0 };
+  return { id: ++nextOid, name: h.name, ti: h.ti, type: TYPES[h.ti], deaths: 0, out: false, bot: false, pieces: [], splitCd: 0, seed: rnd(0, 9), tAng: 0, magUntil: 0, kills: 0, best: START_M, conn: h.conn || null, shield: false, ghostUntil: 0, slowUntil: 0, turboUntil: 0, dblUntil: 0, nGold: 0, nMag: 0, cdSpd: 0, cdMag: 0, team: worldTeams ? (h.team === 1 ? 1 : 0) : -1 };
 }
-function startWorld(humans, nBots) {
+function startWorld(humans, nBots, teams, tcol) {
   if (nBots === undefined) nBots = 15;
+  worldTeams = !!teams; if (tcol) worldTcol = tcol.slice();
   worldNoBots = nBots === 0;
   const N = (humans ? humans.length : 0) + nBots;
   setMap(Math.min(50, Math.max(12, Math.round(12 + (N - 2) * 13 / 14))));
@@ -506,14 +526,16 @@ function endRound() {
   roundOn = false;
   for (const q of pieces) q.prot = time + 9;
   const top = owners.map(o => [o.name, Math.floor(total(o)), o.id, o.ti]).sort((a, b) => b[1] - a[1]);
-  if (hosting()) for (const r of net.room) if (r.conn) sendTo(r.conn, { t: 'end', top });
-  startEndSeq(top, player ? player.id : 0);
+  let tr = null;
+  if (worldTeams) { tr = [0, 0]; for (const q of owners) if (q.team >= 0) tr[q.team] += Math.floor(total(q)); }
+  if (hosting()) for (const r of net.room) if (r.conn) sendTo(r.conn, { t: 'end', top, tr, tc: worldTcol });
+  startEndSeq(top, player ? player.id : 0, tr);
 }
 
 function boost(o, k) {
   if (!o || !o.pieces.length) return false;
   if (k === 'mag') { if (time < o.cdMag) return false; o.cdMag = time + BOOST_CD; o.magUntil = Math.max(o.magUntil, time + 5); }
-  else { if (time < o.cdSpd) return false; o.cdSpd = time + BOOST_CD; o.turboUntil = Math.max(o.turboUntil, time + 3); }
+  else { if (time < o.cdSpd) return false; o.cdSpd = time + BOOST_CD; addTurbo(o, 4); }
   return true;
 }
 
@@ -523,7 +545,7 @@ function think(o) {
   const D = DIFFS[diff];
   let fx = 0, fy = 0, threat = 0, prey = null, preyD = D.prey;
   for (const q of pieces) {
-    if (q.o === o || q.dead) continue;
+    if (q.o === o || q.dead || same(q.o, o)) continue;
     const bigger = q.m > me.m + EQ, iAmBigger = me.m > q.m + EQ, avoid = !D.hunt && !q.o.bot && iAmBigger;
     const smaller = iAmBigger && q.prot < time && !avoid;
     if (!bigger && !smaller && !avoid) continue;
@@ -590,7 +612,7 @@ function step(dt) {
     if (a.prot > time || a.o.ghostUntil > time) continue;
     const hx = a.xs[0], hy = a.ys[0];
     for (const b of pieces) {
-      if (b.o === a.o || b.prot > time || b.o.ghostUntil > time) continue;
+      if (b.o === a.o || same(a.o, b.o) || b.prot > time || b.o.ghostUntil > time) continue;
       const diff = a.m - b.m;
       if (diff <= EQ && diff >= -EQ) continue;
       if (Math.abs(wd(b.xs[0] - hx)) + Math.abs(wd(b.ys[0] - hy)) > b.xs.length * b.d + 80) continue;
@@ -686,8 +708,8 @@ function drawFx() {
     ctx.strokeText('♛', wd(x - cam.x), wd(y - cam.y)); ctx.fillText('♛', wd(x - cam.x), wd(y - cam.y));
   }
 }
-function startEndSeq(top, myId) {
-  endSeq = { t: 1.7, top, myId };
+function startEndSeq(top, myId, tr) {
+  endSeq = { t: 1.7, top, myId, tr };
   const m = $('bigMsg'); m.textContent = _t('timeUp'); m.className = ''; void m.offsetWidth; m.className = 'on';
   $('bigCount').className = ''; $('bigCount').textContent = ''; $('timer').textContent = '0:00';
   SFX.event(); say(_t('timeUp'));
@@ -862,7 +884,8 @@ function drawPiece(p, hw, hh) {
     const king = p.o.id === kingId;
     if (p.o.shield) { ctx.strokeStyle = 'rgba(110,195,255,.9)'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(P[0], P[1], p.r * 2, 0, TAU); ctx.stroke(); }
     if (p.o.slowUntil > time) { ctx.strokeStyle = 'rgba(155,231,255,.7)'; ctx.lineWidth = 2; ctx.setLineDash([5, 5]); ctx.beginPath(); ctx.arc(P[0], P[1], p.r * 1.7, 0, TAU); ctx.stroke(); ctx.setLineDash([]); }
-    ctx.fillStyle = king ? '#ffd23f' : (p.o === player ? '#7ef2c8' : 'rgba(255,255,255,.8)');
+    if (worldTeams && p.o.team >= 0) { ctx.strokeStyle = teamCol(p.o.team); ctx.lineWidth = 3; ctx.globalAlpha = .8; ctx.beginPath(); ctx.arc(P[0], P[1], p.r * 1.45, 0, TAU); ctx.stroke(); ctx.globalAlpha = 1; }
+    ctx.fillStyle = worldTeams && p.o.team >= 0 ? teamCol(p.o.team) : king ? '#ffd23f' : (p.o === player ? '#7ef2c8' : 'rgba(255,255,255,.8)');
     ctx.fillText(p.o.name, P[0], P[1] - p.r * 2.1 - 6);
   }
 }
@@ -937,7 +960,7 @@ function render() {
     }
     for (const o of owners) {
       const p = o.pieces[0]; if (!p) continue;
-      ctx.fillStyle = o === player ? '#fff' : (o.id === kingId ? '#ffd23f' : o.type.c); ctx.beginPath();
+      ctx.fillStyle = o === player ? '#fff' : worldTeams && o.team >= 0 ? teamCol(o.team) : (o.id === kingId ? '#ffd23f' : o.type.c); ctx.beginPath();
       ctx.arc(mx + p.xs[0] / W * S, my + p.ys[0] / W * S, o === player ? 3.2 : Math.min(3, 1.4 + p.m / 80), 0, TAU); ctx.fill();
     }
   }
@@ -950,7 +973,7 @@ const STR = {
     iEasy: 'Kolay: botlar sana saldırmaz, senden uzak durur. Çocuklar için.', iNormal: 'Normal: botlar küçük yılanları kovalar.', iHard: 'Zor: botlar uzaktan kovalar ve sık bölünür.',
     play: 'OYNA', name: 'Adın (çok oyunculu için)', mk: 'Oda kur', join: 'Odaya katıl', lang: 'Dil: Türkçe', sndOn: 'Ses: Açık', sndOff: 'Ses: Kapalı',
     stars: 'Tamamlanan görev: {0}', help: 'Parmağını kaydır: yılan o yöne döner. BÖL: ikiye bölünürsün, ön yarı ileri fırlar. Büyük küçüğü yer: kafana değerse ölürsün, gövdene değerse kuyruğun kopar. Büyük yılana çarparsan yarını kaybedersin. Sağ alttaki HIZ ve MIKNATIS butonları bedava, 10 saniyede bir kullanılır. Tur 3 dakika, en uzun yılan kazanır.',
-    help2: 'Bonuslar: altın yem +10 ve +50, mıknatıs, kalkan, hayalet, dondurucu, turbo, x2 yem. Yediğin yılanın pulları sana akar. Çok oyunculu: biri oda kurar, diğerleri 4 harfli kodla katılır. Ev sahibi ekranı açık tutmalı.',
+    help2: 'Bonuslar: altın yem +10 ve +50, mıknatıs, kalkan, hayalet, turbo (üst üste alınca daha hızlı), x2 yem. Yediğin yılanın pulları sana akar. Çok oyunculu: biri oda kurar, diğerleri 4 harfli kodla katılır. Ev sahibi ekranı açık tutmalı.',
     jTitle: 'Odaya katıl', jInfo: 'Oda kuran kişinin ekranındaki 4 harfli kodu yaz.', codePh: 'KOD', joinGo: 'KATIL', back: 'Geri', rLabel: 'Oda kodu', start: 'BAŞLAT', leave: 'Odadan çık',
     inRoom: 'Odada: {0}', waitStart: 'Ev sahibinin başlatması bekleniyor', connecting: 'Bağlanıyor...', making: 'Oda kuruluyor...',
     eNoNet: 'Çok oyunculu sadece yayınlanan sitede çalışır.', eMake: 'Oda kurulamadı. İnterneti kontrol et.', eCode: 'Kod 4 harf olmalı.', eNoRoom: 'Oda bulunamadı. Kodu kontrol et.', eConn: 'Bağlantı kurulamadı.', eHostLeft: 'Ev sahibi odadan çıktı.', eFull: 'Oda dolu (en fazla 6 kişi).',
@@ -959,7 +982,7 @@ const STR = {
     len: 'Boy', split: 'BÖL', bSpd: 'HIZ', bMag: 'MIKNATIS', hMag: 'Mıknatıs', hGho: 'Hayalet', hShd: 'Kalkan', hSlow: 'Yavaş',
     tMag: 'Mıknatıs!', tShd: 'Kalkan!', tGho: 'Hayalet!', tFrz: 'Dondurucu!', tSlow: 'Dondun!', tTur: 'Turbo!', tDbl: 'Çift yem!', hTur: 'Turbo', hDbl: 'x2 yem', tPlus: '+{0}', tAte: '{0} yem oldu!', tEaten: '{0} seni yedi', tDead: 'Yendin',
     tHalf: 'Yarın gitti!', tHit: 'Çarptın!', tBit: 'Kuyruğun koptu!', tShdBreak: 'Kalkan kırıldı!', tKing: 'Kralı yedin! +20',
-    evRain: 'Yem yağmuru!', evGold: 'Altın fırtınası!', evSpeed: 'Herkes hızlı!', evFinal: 'Son 30 saniye! Yemler çift sayılır.', evMag: 'Herkese mıknatıs!', botsOn: 'Botlar: Açık', botsOff: 'Bot yok (botsuz mod)', botN: 'Bot sayısı: {0}', botWarn: '30 üstü bot eski telefonlarda kasabilir.', need2: 'Botsuz oyun için en az 2 kişi gerekli.', spec: 'Elendin! Tur bitene kadar izliyorsun.', timeUp: 'SÜRE BİTTİ!', c2: 'ÇİFT!', c3: 'ÜÇLÜ!', c4: 'DURDURULAMAZ!', kingMe: 'Kral sensin!',
+    evRain: 'Yem yağmuru!', evGold: 'Altın fırtınası!', evSpeed: 'Herkes hızlı!', evFinal: 'Son 30 saniye! Yemler çift sayılır.', evMag: 'Herkese mıknatıs!', botsOn: 'Botlar: Açık', botsOff: 'Bot yok (botsuz mod)', botN: 'Bot sayısı: {0}', teamOn: 'Takım savaşı: Açık', teamOff: 'Takım savaşı: Kapalı', teamPick: 'Takımını seç:', tColor: 'Renk:', tWin: 'Kazanan: {0} takım!', botWarn: '30 üstü bot eski telefonlarda kasabilir.', need2: 'Botsuz oyun için en az 2 kişi gerekli.', spec: 'Elendin! Tur bitene kadar izliyorsun.', timeUp: 'SÜRE BİTTİ!', c2: 'ÇİFT!', c3: 'ÜÇLÜ!', c4: 'DURDURULAMAZ!', kingMe: 'Kral sensin!',
     mis: 'Görev: {0}', mKills: '{0} yılan ye', mLen: '{0} boya ulaş', mGold: '{0} altın yem topla', mMag: '{0} mıknatıs topla', misDone: 'Görev tamam!', unlock: 'Yeni yılan açıldı: {0}', locked: 'Kilitli · {0} görev'
   },
   de: {
@@ -967,7 +990,7 @@ const STR = {
     iEasy: 'Leicht: Bots greifen dich nicht an und halten Abstand. Für Kinder.', iNormal: 'Normal: Bots jagen kleinere Schlangen.', iHard: 'Schwer: Bots jagen von weitem und teilen sich oft.',
     play: 'SPIELEN', name: 'Dein Name (für Mehrspieler)', mk: 'Raum erstellen', join: 'Raum beitreten', lang: 'Sprache: Deutsch', sndOn: 'Ton: An', sndOff: 'Ton: Aus',
     stars: 'Geschaffte Missionen: {0}', help: 'Finger wischen: die Schlange dreht in diese Richtung. TEIL: du teilst dich, die vordere Hälfte schießt nach vorn. Groß frisst klein: am Kopf getroffen stirbst du, am Körper getroffen verlierst du den Schwanz. Rammst du eine größere Schlange, verlierst du die Hälfte. TEMPO und MAGNET unten rechts sind gratis, alle 10 Sekunden nutzbar. Eine Runde dauert 3 Minuten, die längste Schlange gewinnt.',
-    help2: 'Boni: Goldfutter +10 und +50, Magnet, Schild, Geist, Frost, Turbo, x2 Futter. Die Schuppen gefressener Schlangen fliegen zu dir. Mehrspieler: einer erstellt einen Raum, die anderen treten mit dem 4-Buchstaben-Code bei. Der Gastgeber muss den Bildschirm anlassen.',
+    help2: 'Boni: Goldfutter +10 und +50, Magnet, Schild, Geist, Turbo (stapelbar), x2 Futter. Die Schuppen gefressener Schlangen fliegen zu dir. Mehrspieler: einer erstellt einen Raum, die anderen treten mit dem 4-Buchstaben-Code bei. Der Gastgeber muss den Bildschirm anlassen.',
     jTitle: 'Raum beitreten', jInfo: 'Gib den 4-Buchstaben-Code vom Bildschirm des Gastgebers ein.', codePh: 'CODE', joinGo: 'BEITRETEN', back: 'Zurück', rLabel: 'Raumcode', start: 'START', leave: 'Raum verlassen',
     inRoom: 'Im Raum: {0}', waitStart: 'Warte auf den Start durch den Gastgeber', connecting: 'Verbinde...', making: 'Raum wird erstellt...',
     eNoNet: 'Mehrspieler funktioniert nur auf der veröffentlichten Seite.', eMake: 'Raum konnte nicht erstellt werden. Internet prüfen.', eCode: 'Der Code hat 4 Buchstaben.', eNoRoom: 'Raum nicht gefunden. Code prüfen.', eConn: 'Verbindung fehlgeschlagen.', eHostLeft: 'Der Gastgeber hat den Raum verlassen.', eFull: 'Raum voll (höchstens 6 Spieler).',
@@ -976,7 +999,7 @@ const STR = {
     len: 'Länge', split: 'TEIL', bSpd: 'TEMPO', bMag: 'MAGNET', hMag: 'Magnet', hGho: 'Geist', hShd: 'Schild', hSlow: 'Langsam',
     tMag: 'Magnet!', tShd: 'Schild!', tGho: 'Geist!', tFrz: 'Frost!', tSlow: 'Eingefroren!', tTur: 'Turbo!', tDbl: 'Doppeltes Futter!', hTur: 'Turbo', hDbl: 'x2 Futter', tPlus: '+{0}', tAte: '{0} gefressen!', tEaten: '{0} hat dich gefressen', tDead: 'Gefressen',
     tHalf: 'Hälfte verloren!', tHit: 'Aufprall!', tBit: 'Schwanz ab!', tShdBreak: 'Schild zerbrochen!', tKing: 'König gefressen! +20',
-    evRain: 'Futterregen!', evGold: 'Goldsturm!', evSpeed: 'Alle schnell!', evFinal: 'Letzte 30 Sekunden! Futter zählt doppelt.', evMag: 'Magnet für alle!', botsOn: 'Bots: An', botsOff: 'Keine Bots (ohne Bots)', botN: 'Bots: {0}', botWarn: 'Über 30 Bots kann ältere Handys ruckeln lassen.', need2: 'Ohne Bots braucht ihr mindestens 2 Spieler.', spec: 'Ausgeschieden! Du schaust bis zum Rundenende zu.', timeUp: 'ZEIT UM!', c2: 'DOPPEL!', c3: 'DREIFACH!', c4: 'UNAUFHALTSAM!', kingMe: 'Du bist König!',
+    evRain: 'Futterregen!', evGold: 'Goldsturm!', evSpeed: 'Alle schnell!', evFinal: 'Letzte 30 Sekunden! Futter zählt doppelt.', evMag: 'Magnet für alle!', botsOn: 'Bots: An', botsOff: 'Keine Bots (ohne Bots)', botN: 'Bots: {0}', teamOn: 'Teamkampf: An', teamOff: 'Teamkampf: Aus', teamPick: 'Wähle dein Team:', tColor: 'Farbe:', tWin: 'Sieger: Team {0}!', botWarn: 'Über 30 Bots kann ältere Handys ruckeln lassen.', need2: 'Ohne Bots braucht ihr mindestens 2 Spieler.', spec: 'Ausgeschieden! Du schaust bis zum Rundenende zu.', timeUp: 'ZEIT UM!', c2: 'DOPPEL!', c3: 'DREIFACH!', c4: 'UNAUFHALTSAM!', kingMe: 'Du bist König!',
     mis: 'Mission: {0}', mKills: 'Friss {0} Schlangen', mLen: 'Erreiche Länge {0}', mGold: 'Sammle {0} Goldfutter', mMag: 'Sammle {0} Magnete', misDone: 'Mission geschafft!', unlock: 'Neue Schlange frei: {0}', locked: 'Gesperrt · {0} Missionen'
   }
 };
@@ -1079,7 +1102,7 @@ function hud() {
   if (player.ghostUntil > time) st.push(_t('hGho') + ' ' + Math.ceil(player.ghostUntil - time));
   if (player.shield) st.push(_t('hShd'));
   if (player.slowUntil > time) st.push(_t('hSlow'));
-  if (player.turboUntil > time) st.push(_t('hTur') + ' ' + Math.ceil(player.turboUntil - time));
+  if (player.turboUntil > time) st.push(_t('hTur') + ' x' + (1 + .4 * Math.max(1, player.turboLv | 0)).toFixed(1) + ' ' + Math.ceil(player.turboUntil - time));
   if (player.dblUntil > time) st.push(_t('hDbl') + ' ' + Math.ceil(player.dblUntil - time));
   $('mag').textContent = st.join(' · ');
   if (roundOn || isClient()) {
@@ -1087,6 +1110,10 @@ function hud() {
     $('timer').textContent = ((sec / 60) | 0) + ':' + ('0' + (sec % 60)).slice(-2); $('timer').style.color = sec <= FINAL_T ? '#ff5fb0' : '#fff';
     if (kingId !== lastKing) { if (kingId === player.id && time > 8) { toast(_t('kingMe')); say(_t('kingMe')); } lastKing = kingId; }
   } else $('timer').textContent = '';
+  if (worldTeams) {
+    const t = [0, 0]; for (const q of owners) if (q.team >= 0) t[q.team] += Math.floor(total(q));
+    $('teamBar').innerHTML = '<span style="color:' + teamCol(0) + '">' + esc(tcName(worldTcol[0])) + ' ' + t[0] + '</span> – <span style="color:' + teamCol(1) + '">' + t[1] + ' ' + esc(tcName(worldTcol[1])) + '</span>';
+  } else $('teamBar').textContent = '';
   if (mode === 'play') tickMission();
   const list = owners.filter(o => !o.out && o.pieces.length).map(o => [o, Math.floor(total(o))]).sort((a, b) => b[1] - a[1]);
   const myRank = list.findIndex(e => e[0] === player), show = list.slice(0, 10).map((e, i) => [e, i]);
@@ -1097,7 +1124,7 @@ function hud() {
     if (!el) { el = document.createElement('div'); bd.appendChild(el); bRows.set(o.id, el); el.rank = i; }
     el.className = 'br' + (o === player ? ' me' : '') + (o === player && i < el.rank ? ' up' : '');
     el.rank = i; el.style.top = (2 + slot * 17) + 'px';
-    el.innerHTML = '<span>' + (i + 1) + '. ' + (o.id === kingId ? '♛ ' : '') + esc(o.name) + '</span><span>' + e[1] + '</span>';
+    el.innerHTML = '<span>' + (i + 1) + '. ' + (worldTeams && o.team >= 0 ? '<i style="font-style:normal;color:' + teamCol(o.team) + '">\u25CF</i> ' : '') + (o.id === kingId ? '\u265B ' : '') + esc(o.name) + '</span><span>' + e[1] + '</span>';
     seen.add(o.id);
   });
   for (const [id, el] of Array.from(bRows)) if (!seen.has(id)) { if (el.parentNode) el.parentNode.removeChild(el); bRows.delete(id); }
@@ -1110,8 +1137,11 @@ function hud() {
     const el = $(id); el.classList.toggle('off', cdv > 0 || !p); el.textContent = cdv > 0 ? Math.ceil(cdv) : _t(k);
   }
 }
-function showPodium(top, myId) {
+function showPodium(top, myId, tr) {
   mode = 'podium'; $('hud').classList.remove('on'); showOv('podium');
+  const tw = tr ? (tr[0] >= tr[1] ? 0 : 1) : -1;
+  $('pTitle').textContent = tr ? _t('tWin', tcName(worldTcol[tw])) : _t('pTitle'); $('pTitle').style.color = tr ? TCOLS[worldTcol[tw]][2] : '';
+  $('pTeam').textContent = tr ? tcName(worldTcol[0]) + ' ' + tr[0] + ' – ' + tr[1] + ' ' + tcName(worldTcol[1]) : '';
   let h = ''; top.slice(0, 3).forEach((e, i) => { h += '<div class="prow p' + i + '"><span>' + (i + 1) + '. ' + esc(e[0]) + '</span><span>' + e[1] + '</span></div>'; });
   $('pList').innerHTML = h;
   const delays = [1300, 750, 250];
@@ -1121,7 +1151,7 @@ function showPodium(top, myId) {
     if (!e) continue;
     $('pn' + i).textContent = e[0]; $('pl' + i).textContent = e[1];
     drawThumb($('pk' + i), TYPES[e[3] | 0] || TYPES[0]);
-    setTimeout(() => { if (mode !== 'podium') return; col.className = 'pcol go'; beep(440 + (2 - i) * 220, 660 + (2 - i) * 220, .18, 'triangle', .1); if (i === 0) { startConfetti(); SFX.win(); say(_t('winner', e[0])); } }, delays[i]);
+    setTimeout(() => { if (mode !== 'podium') return; col.className = 'pcol go'; beep(440 + (2 - i) * 220, 660 + (2 - i) * 220, .18, 'triangle', .1); if (i === 0) { startConfetti(); SFX.win(); say(tr ? _t('tWin', tcName(worldTcol[tw])) : _t('winner', e[0])); } }, delays[i]);
   }
   const r = top.findIndex(e => e[2] === myId);
   $('pMe').textContent = r >= 0 ? _t('pMe', r + 1, top[r][1]) : '';
@@ -1156,10 +1186,10 @@ function gameOver() {
 }
 function myName() { const v = (($('name').value || '') + '').trim().slice(0, 10); return v || 'SEN'; }
 function enterPlay() { endSeq = null; conf = []; $('bigMsg').className = ''; $('hud').classList.remove('spec'); mode = 'play'; mis = null; misWait = 0; misIdx = save.stars; fxAlive = false; showOv(null); $('hud').classList.add('on'); hud(); }
-function play() { unlockAudio(); startWorld([{ name: myName(), ti: selType }], Math.max(1, botCount)); enterPlay(); }
+function play() { unlockAudio(); startWorld([{ name: myName(), ti: selType }], Math.max(1, botCount), false); enterPlay(); }
 function toMenu(msg) {
   leaveNet(); endSeq = null; conf = []; $('bigMsg').className = ''; mode = 'menu'; player = null; $('hud').classList.remove('on'); showOv('menu'); $('menuMsg').textContent = msg || ''; $('mStars').textContent = _t('stars', save.stars);
-  startWorld(null);
+  startWorld(null, 15, false);
 }
 
 /* ---------- multiplayer ---------- */
@@ -1177,8 +1207,8 @@ function freeType(want, rid) {
 }
 function sendTo(conn, m) { try { if (conn && conn.open) conn.send(m); } catch (e) {} }
 function castLobby() {
-  const players = net.room.map(r => ({ id: r.id, name: r.name, ti: r.ti }));
-  for (const r of net.room) if (r.conn) sendTo(r.conn, { t: 'lobby', players, you: r.id, code: net.code, nBots: net.nBots });
+  const players = net.room.map(r => ({ id: r.id, name: r.name, ti: r.ti, team: r.team | 0 }));
+  for (const r of net.room) if (r.conn) sendTo(r.conn, { t: 'lobby', players, you: r.id, code: net.code, nBots: net.nBots, teams: net.teams, tcol: net.tcol });
   drawRoom();
 }
 function drawRoom() {
@@ -1191,6 +1221,17 @@ function drawRoom() {
   $('rBotWarn').textContent = net.nBots > 30 ? _t('botWarn') : '';
   const need = !net.nBots && net.room.length < 2; $('startBtn').style.opacity = need ? '.5' : '1';
   if (need) $('roomMsg').textContent += ' · ' + _t('need2');
+  const host = net.role === 'host';
+  $('teamBtn').textContent = _t(net.teams ? 'teamOn' : 'teamOff'); $('teamBtn').style.opacity = host ? '1' : '.6';
+  $('teamBox').style.display = net.teams ? 'block' : 'none'; $('tColRow').style.display = host ? 'flex' : 'none';
+  $('teamPickL').textContent = _t('teamPick');
+  const tc = net.tcol || [0, 1], mine = me ? me.team | 0 : 0;
+  ['tA', 'tB'].forEach((id, t) => {
+    const b = $(id), n = net.room.filter(r => (r.team | 0) === t);
+    b.style.background = TCOLS[tc[t]][2]; b.classList.toggle('sel', mine === t);
+    b.textContent = tcName(tc[t]) + ' (' + n.length + ')' + (n.length ? ': ' + n.map(r => r.name).join(', ') : '');
+    $(t ? 'tColB' : 'tColA').textContent = _t('tColor') + ' ' + tcName(tc[t]);
+  });
   rCards.forEach((b, i) => {
     const who = net.room.find(r => r.ti === i), lock = isLocked(i) && !who;
     b.classList.toggle('taken', lock || (!!who && who.id !== net.myRid)); b.classList.toggle('sel', !!who && who.id === net.myRid);
@@ -1199,8 +1240,9 @@ function drawRoom() {
 }
 function allFood() { const a = []; for (const c of cells) for (const f of c.items) a.push(enc(f)); return a; }
 function hostAdmit(r) {
+  if (worldTeams && r.team === undefined) r.team = smallTeam(null);
   const o = mkHuman(r); r.o = o; owners.push(o); spawn(o);
-  sendTo(r.conn, { t: 'start', you: o.id, food: allFood(), gc: GC, nb: worldNoBots });
+  sendTo(r.conn, { t: 'start', you: o.id, food: allFood(), gc: GC, nb: worldNoBots, tm: worldTeams, tc: worldTcol });
 }
 function hostDrop(r) {
   net.room = net.room.filter(q => q !== r);
@@ -1209,7 +1251,8 @@ function hostDrop(r) {
 }
 function hostMsg(r, m) {
   if (!m || typeof m !== 'object') return;
-  if (m.t === 'pick') { const t = m.ti | 0; if (t >= 0 && t < TYPES.length && !r.o && freeType(t, r.id) === t) { r.ti = t; castLobby(); } }
+  if (m.t === 'team') { if (!net.started) { r.team = m.k === 1 ? 1 : 0; castLobby(); } }
+  else if (m.t === 'pick') { const t = m.ti | 0; if (t >= 0 && t < TYPES.length && !r.o && freeType(t, r.id) === t) { r.ti = t; castLobby(); } }
   else if (!r.o) return;
   else if (m.t === 'in') { if (typeof m.a === 'number' && isFinite(m.a)) r.o.tAng = m.a; }
   else if (m.t === 'split') split(r.o);
@@ -1218,7 +1261,7 @@ function hostMsg(r, m) {
 }
 function makeRoom() {
   if (typeof Peer === 'undefined') { $('menuMsg').textContent = _t('eNoNet'); return; }
-  unlockAudio(); leaveNet(); net.role = 'host'; net.myRid = 0; net.code = ''; net.nBots = botCount;
+  unlockAudio(); leaveNet(); net.role = 'host'; net.myRid = 0; net.code = ''; net.nBots = botCount; net.teams = false; net.tcol = [0, 1];
   net.room = [{ id: 0, name: myName(), ti: selType, conn: null }];
   mode = 'room'; showOv('room'); drawRoom(); $('roomMsg').textContent = _t('making');
   let rid = 0;
@@ -1251,15 +1294,15 @@ function makeRoom() {
 function startRoom() {
   if (net.role !== 'host' || !net.code) return;
   if (!net.nBots && net.room.length < 2) { drawRoom(); return; }
-  startWorld(net.room, net.nBots);
+  startWorld(net.room, net.nBots, net.teams, net.tcol);
   net.started = true; netAdd = []; netRem = [];
   const food = allFood();
-  for (const r of net.room) if (r.conn) sendTo(r.conn, { t: 'start', you: r.o.id, food, gc: GC, nb: worldNoBots });
+  for (const r of net.room) if (r.conn) sendTo(r.conn, { t: 'start', you: r.o.id, food, gc: GC, nb: worldNoBots, tm: worldTeams, tc: worldTcol });
   enterPlay();
 }
 const r1 = v => Math.round(v * 10) / 10, r3 = v => Math.round(v * 1000) / 1000;
 function broadcast() {
-  const o = owners.map(q => [q.id, q.name, q.ti, q.deaths, q.out ? 1 : 0, q.bot ? 1 : 0, r1(Math.max(0, q.magUntil - time)), r1(Math.max(0, q.splitCd - time)), q.kills | 0, q.best | 0, q.shield ? 1 : 0, r1(Math.max(0, q.ghostUntil - time)), r1(Math.max(0, q.slowUntil - time)), q.nGold | 0, q.nMag | 0, r1(Math.max(0, q.turboUntil - time)), r1(Math.max(0, q.dblUntil - time)), r1(Math.max(0, q.cdSpd - time)), r1(Math.max(0, q.cdMag - time))]);
+  const o = owners.map(q => [q.id, q.name, q.ti, q.deaths, q.out ? 1 : 0, q.bot ? 1 : 0, r1(Math.max(0, q.magUntil - time)), r1(Math.max(0, q.splitCd - time)), q.kills | 0, q.best | 0, q.shield ? 1 : 0, r1(Math.max(0, q.ghostUntil - time)), r1(Math.max(0, q.slowUntil - time)), q.nGold | 0, q.nMag | 0, r1(Math.max(0, q.turboUntil - time)), r1(Math.max(0, q.dblUntil - time)), r1(Math.max(0, q.cdSpd - time)), r1(Math.max(0, q.cdMag - time)), q.turboLv | 0, q.team === undefined ? -1 : q.team]);
   const p = [];
   for (const q of owners) for (const s of q.pieces) p.push([s.id, q.id, r1(s.xs[0]), r1(s.ys[0]), r3(s.ang), r3(s.m), r1(Math.max(0, s.prot - time)), s.dash > 0 ? 1 : 0, s.parent | 0]);
   const fa = netAdd.map(enc), fr = netRem; netAdd = []; netRem = [];
@@ -1286,18 +1329,18 @@ function clientMsg(m) {
   if (!m) return;
   if (m.t === 'full') { leaveNet(); $('joinMsg').textContent = _t('eFull'); }
   else if (m.t === 'lobby') {
-    net.room = m.players; net.myRid = m.you; net.nBots = m.nBots | 0;
+    net.room = m.players; net.myRid = m.you; net.nBots = m.nBots | 0; net.teams = !!m.teams; net.tcol = m.tcol || [0, 1];
     if (!net.started && mode !== 'room') { mode = 'room'; showOv('room'); }
     drawRoom();
   } else if (m.t === 'start') {
-    setMap(m.gc || 25); worldNoBots = !!m.nb;
+    setMap(m.gc || 25); worldNoBots = !!m.nb; worldTeams = !!m.tm; if (m.tc) worldTcol = m.tc;
     owners = []; pieces = []; player = null; time = 0; specials = []; homing = []; parts = []; rings = []; floats = [];
     ownById.clear(); pcById.clear(); foodById.clear();
     cells = []; for (let i = 0; i < GC * GC; i++) cells.push({ items: [], dots: 0 });
     for (const a of m.food) addNetFood(a);
     net.you = m.you; net.started = true; net.lastEv = null; roundOn = false; kingId = 0; lastKing = 0; speedUntil = 0; enterPlay();
   } else if (m.t === 's' && net.started) { if (mode !== 'podium') applySnap(m); }
-  else if (m.t === 'end' && net.started) startEndSeq(m.top, net.you);
+  else if (m.t === 'end' && net.started) { if (m.tc) worldTcol = m.tc; startEndSeq(m.top, net.you, m.tr); }
 }
 function applySnap(m) {
   const seenO = new Set();
@@ -1305,7 +1348,7 @@ function applySnap(m) {
     let o = ownById.get(a[0]);
     if (!o) { o = { id: a[0], pieces: [], tAng: 0, seed: a[0] % 9 }; ownById.set(a[0], o); }
     o.name = a[1]; o.ti = a[2]; o.type = TYPES[a[2]]; o.deaths = a[3]; o.out = !!a[4]; o.bot = !!a[5];
-    o.magUntil = time + a[6]; o.splitCd = time + a[7]; o.kills = a[8]; o.best = a[9]; o.shield = !!a[10]; o.ghostUntil = time + a[11]; o.slowUntil = time + a[12]; o.nGold = a[13]; o.nMag = a[14]; o.turboUntil = time + (a[15] || 0); o.dblUntil = time + (a[16] || 0); o.cdSpd = time + (a[17] || 0); o.cdMag = time + (a[18] || 0); o.pieces = []; seenO.add(a[0]);
+    o.magUntil = time + a[6]; o.splitCd = time + a[7]; o.kills = a[8]; o.best = a[9]; o.shield = !!a[10]; o.ghostUntil = time + a[11]; o.slowUntil = time + a[12]; o.nGold = a[13]; o.nMag = a[14]; o.turboUntil = time + (a[15] || 0); o.dblUntil = time + (a[16] || 0); o.cdSpd = time + (a[17] || 0); o.cdMag = time + (a[18] || 0); o.turboLv = a[19] | 0; o.team = a[20] === undefined ? -1 : a[20]; o.pieces = []; seenO.add(a[0]);
   }
   for (const id of Array.from(ownById.keys())) if (!seenO.has(id)) ownById.delete(id);
   owners = Array.from(ownById.values());
@@ -1403,6 +1446,16 @@ const bstep = (v, d, min) => { let i = BSTEPS.indexOf(v); if (i < 0) i = BSTEPS.
 function drawBots() { $('botLbl').textContent = _t('botN', botCount); $('botWarn').textContent = botCount > 30 ? _t('botWarn') : ''; }
 $('botMinus').addEventListener('click', () => { botCount = bstep(botCount, -1, 1); persist(); drawBots(); });
 $('botPlus').addEventListener('click', () => { botCount = bstep(botCount, 1, 1); persist(); drawBots(); });
+$('teamBtn').addEventListener('click', () => { if (net.role !== 'host' || net.started) return; net.teams = !net.teams; castLobby(); });
+['tA', 'tB'].forEach((id, t) => $(id).addEventListener('click', () => {
+  if (net.started) return;
+  if (net.role === 'host') { net.room[0].team = t; castLobby(); } else if (net.role === 'client') sendTo(net.conn, { t: 'team', k: t });
+}));
+['tColA', 'tColB'].forEach((id, t) => $(id).addEventListener('click', () => {
+  if (net.role !== 'host' || net.started) return;
+  let c = net.tcol[t]; do { c = (c + 1) % TCOLS.length; } while (c === net.tcol[1 - t]);
+  net.tcol[t] = c; castLobby();
+}));
 $('rBotMinus').addEventListener('click', () => { if (net.role !== 'host' || net.started) return; net.nBots = bstep(net.nBots, -1, 0); castLobby(); });
 $('rBotPlus').addEventListener('click', () => { if (net.role !== 'host' || net.started) return; net.nBots = bstep(net.nBots, 1, 0); castLobby(); });
 $('nextRound').addEventListener('click', () => { if (net.role === 'host') startRoom(); else if (!net.role) play(); });
@@ -1453,7 +1506,7 @@ let last = 0;
 function frame(now) {
   const rdt = Math.min(.05, (now - last) / 1000 || 0); last = now;
   let dt = rdt;
-  if (endSeq) { dt *= .25; endSeq.t -= rdt; if (endSeq.t <= 0) { const e = endSeq; endSeq = null; $('bigMsg').className = ''; showPodium(e.top, e.myId); } }
+  if (endSeq) { dt *= .25; endSeq.t -= rdt; if (endSeq.t <= 0) { const e = endSeq; endSeq = null; $('bigMsg').className = ''; showPodium(e.top, e.myId, e.tr); } }
   for (const c of countups) { const k = Math.min(1, (now - c.t0) / 1000); c.el.textContent = Math.round(c.to * (1 - Math.pow(1 - k, 3))); c.done = k >= 1; }
   countups = countups.filter(c => !c.done);
   if (mode === 'podium') {
