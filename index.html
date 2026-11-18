@@ -36,6 +36,9 @@
   #split { position: absolute; right: 18px; bottom: 96px; width: 92px; height: 92px; border-radius: 50%; border: 0; pointer-events: auto; font: 800 19px 'Outfit', sans-serif; color: #063326; background: linear-gradient(#7ef2c8, #2fc49a); box-shadow: 0 7px 0 #1c8a6c, 0 0 26px rgba(126,242,200,.35); touch-action: none; }
   .bst { position: absolute; width: 68px; height: 68px; border-radius: 50%; border: 0; pointer-events: auto; font: 800 11px 'Outfit', sans-serif; color: #fff; touch-action: none; }
   #bSpd { right: 124px; bottom: 108px; background: linear-gradient(#ffb057, #ff7a1a); box-shadow: 0 6px 0 #b04a00, 0 0 20px rgba(255,122,26,.35); }
+  #bEject { right: 124px; bottom: 206px; display: none; background: linear-gradient(#9ae6ff, #3b8bff); box-shadow: 0 6px 0 #1d4fa0, 0 0 20px rgba(59,139,255,.35); }
+  #hud.ball #bEject { display: block; }
+  #hud.spec #bEject { display: none; }
   #bMag { right: 30px; bottom: 206px; background: linear-gradient(#ff8ac6, #ff3c9a); box-shadow: 0 6px 0 #a3185f, 0 0 20px rgba(255,60,154,.35); }
   .bst.off { filter: grayscale(.8); opacity: .5; }
   #split.off { filter: grayscale(.8); opacity: .5; box-shadow: 0 7px 0 #1c8a6c; }
@@ -94,7 +97,7 @@
   .brow span { flex: 1; font-weight: 800; font-size: 18px; }
   #botWarn, #rBotWarn { color: #ff8aa8; }
   #diff, #opts { display: flex; flex-wrap: wrap; gap: 8px; max-width: 420px; margin: 6px auto 0; }
-  #patBtn { flex-basis: 100%; }
+  #patBtn, #gmBtn { flex-basis: 100%; }
   .dbtn { flex: 1; padding: 13px 0; border: 0; border-radius: 16px; font: 800 16px 'Outfit', sans-serif; color: #c7b8ff; background: transparent; box-shadow: inset 0 0 0 2px #7b66d6; }
   .dbtn.sel { color: #063326; background: linear-gradient(#7ef2c8, #2fc49a); box-shadow: 0 5px 0 #1c8a6c; }
   .num { font-weight: 800; font-size: 30px; color: #7ef2c8; }
@@ -114,6 +117,7 @@
   <button id="split">BÖL</button>
   <button class="bst" id="bSpd"></button>
   <button class="bst" id="bMag"></button>
+  <button class="bst" id="bEject"></button>
 </div>
 
 <div class="ov on" id="menu">
@@ -137,6 +141,7 @@
     <button class="dbtn" id="langBtn"></button>
     <button class="dbtn" id="sndBtn"></button>
     <button class="dbtn" id="patBtn"></button>
+    <button class="dbtn" id="gmBtn"></button>
   </div>
   <p id="mStars"></p>
   <p id="mHelp"></p>
@@ -159,6 +164,7 @@
   <div id="roomPicker" class="pickgrid"></div>
   <div class="brow" id="rBotRow"><button class="dbtn" id="rBotMinus">−</button><span id="rBotLbl"></span><button class="dbtn" id="rBotPlus">+</button></div>
   <p id="rBotWarn"></p>
+  <button class="big ghost" id="rGmBtn"></button>
   <button class="big ghost" id="rPatBtn"></button>
   <button class="big ghost" id="teamBtn"></button>
   <div id="teamBox">
@@ -229,12 +235,12 @@ const DOT_COLS = ['#7ef2c8', '#ff5fb0', '#ffd166', '#6ec3ff', '#c79bff'];
 const CELL = 160, TAU = Math.PI * 2;
 let W = 4000, GC = 25, worldNoBots = false;
 function setMap(gc) { GC = gc; W = gc * CELL; }
-const specN = k => Math.max(k === 'g50' ? 1 : 2, Math.round(SPEC[k].n * GC * GC / 625));
+const specN = k => k === 'vir' && !ballMode ? 0 : Math.max(k === 'g50' ? 1 : 2, Math.round(SPEC[k].n * GC * GC / 625));
 const BOTS = 15, LIVES = 3, START_M = 10, SPLIT_MIN = 16, EQ = 3;
 const MAG_R = 260, MAG_T = 8, HIT_PROT = 3;
 const SPEC = { g10: { n: 6, v: 10, r: 11, w: 10 }, g50: { n: 1, v: 50, r: 17, w: 50 }, mag: { n: 6, v: 0, r: 13, w: 8 },
   shd: { n: 3, v: 0, r: 13, w: 6 }, gho: { n: 3, v: 0, r: 13, w: 5 },
-  tur: { n: 3, v: 0, r: 13, w: 6 }, dbl: { n: 3, v: 0, r: 13, w: 6 } };
+  tur: { n: 3, v: 0, r: 13, w: 6 }, dbl: { n: 3, v: 0, r: 13, w: 6 }, vir: { n: 8, v: 0, r: 46, w: 0 } };
 const ROUND_T = 180, FINAL_T = 30, BOOST_CD = 10;
 const TCOLS = [['Kırmızı', 'Rot', '#ff3b5c'], ['Mavi', 'Blau', '#3b8bff'], ['Sarı', 'Gelb', '#ffd23f'], ['Yeşil', 'Grün', '#39d353'], ['Mor', 'Lila', '#b45cff'], ['Turuncu', 'Orange', '#ff8a1a'], ['Lacivert', 'Navy', '#2a4cc9'], ['Beyaz', 'Weiß', '#f2f2f2']];
 let worldTeams = false, worldTcol = [0, 1];
@@ -272,7 +278,7 @@ const net = { role: null, peer: null, conn: null, started: false, room: [], myRi
 const ownById = new Map(), pcById = new Map(), foodById = new Map();
 const hosting = () => net.role === 'host' && net.started;
 const isClient = () => net.role === 'client' && net.started;
-const KINDS = [null, null, 'g10', 'g50', 'mag', 'shd', 'gho', 'frz', 'tur', 'dbl'];
+const KINDS = [null, null, 'g10', 'g50', 'mag', 'shd', 'gho', 'frz', 'tur', 'dbl', 'vir'];
 let homing = [];
 function reg(f, cell) { f.id = ++nextFid; f.cell = cell; f.born = time; cell.items.push(f); if (hosting()) netAdd.push(f); return f; }
 const enc = f => [f.id, Math.round(f.x), Math.round(f.y), f.k, f.ci, f.owner && time < f.ownUntil ? f.owner : 0];
@@ -295,7 +301,7 @@ function addSpecial(kind, ax, ay) {
 function take(f, p, cell) {
   const o = p.o;
   const dbl = o.dblUntil > time ? 2 : 1;
-  p.m += f.kind ? f.v : (f.dot ? f.v * 200 / (200 + p.m) * (finalOn ? 2 : 1) : f.v * 500 / (500 + p.m)) * dbl;
+  p.m += f.kind ? f.v : ballMode ? (f.dot ? f.v * 2 * (finalOn ? 2 : 1) : f.v) * dbl : (f.dot ? f.v * 200 / (200 + p.m) * (finalOn ? 2 : 1) : f.v * 500 / (500 + p.m)) * dbl;
   if (f.dot) cell.dots--;
   f.gone = true;
   if (hosting()) netRem.push(f.id);
@@ -308,7 +314,8 @@ function take(f, p, cell) {
   else if (f.kind === 'frz') {
     for (const q of owners) { const h = q.pieces[0]; if (q !== o && h && Math.hypot(wd(h.xs[0] - p.xs[0]), wd(h.ys[0] - p.ys[0])) < 900) { q.slowUntil = time + 4; toastFor(q, 'tSlow'); } }
     toastFor(o, 'tFrz');
-  } else if (f.kind === 'tur') { addTurbo(o, 6); toastFor(o, 'tTur'); }
+  } else if (f.kind === 'vir') { p.m += 30; popCell(p); toastFor(o, 'tPop'); }
+  else if (f.kind === 'tur') { addTurbo(o, 6); toastFor(o, 'tTur'); }
   else if (f.kind === 'dbl') { o.dblUntil = time + 15; toastFor(o, 'tDbl'); }
   else { o.nGold = (o.nGold | 0) + 1; toastFor(o, 'tPlus', f.v * dbl); }
 }
@@ -370,12 +377,14 @@ function refill() {
   if (Math.random() < .02) for (const k in SPEC) { let c = 0; for (const f of specials) if (f.kind === k) c++; if (c < specN(k)) { addSpecial(k); break; } }
 }
 function eat(p, dt) {
-  const hx = p.xs[0], hy = p.ys[0], cx = (hx / CELL) | 0, cy = (hy / CELL) | 0, mag = p.o.magUntil > time, R = mag ? 2 : 1, cl = isClient();
+  const hx = p.xs[0], hy = p.ys[0], cx = (hx / CELL) | 0, cy = (hy / CELL) | 0, mag = p.o.magUntil > time, R = (mag ? 2 : 1) + (p.r > 60 ? Math.ceil(p.r / CELL) : 0), cl = isClient();
   for (let oy = -R; oy <= R; oy++) for (let ox = -R; ox <= R; ox++) {
     const cell = cells[((cy + oy + GC) % GC) * GC + ((cx + ox + GC) % GC)], it = cell.items;
     for (let i = it.length - 1; i >= 0; i--) {
       const f = it[i];
       if (f.owner && f.owner !== p.o.id && time < f.ownUntil) continue;
+      if (f.block === p.o.id && time < f.blockUntil) continue;
+      if (f.kind === 'vir' && (!ballMode || p.m < VIR_M)) { continue; }
       const dx = wd(f.x - hx), dy = wd(f.y - hy), d2 = dx * dx + dy * dy, reach = p.r + f.r + 5;
       if (d2 < reach * reach) {
         if (cl) continue;
@@ -391,14 +400,105 @@ function eat(p, dt) {
 }
 
 /* ---------- snakes ---------- */
+let ballMode = false, ballPref = false;
+const BALL_SPLIT = 36, BALL_MAX = 16, BALL_START = 20, VIR_M = 130;
+const ballR = m => 6 + Math.sqrt(Math.max(1, m)) * 4;
+function newCell(o, x, y, m, ang, parent) {
+  const c = { id: ++nextPid, parent: parent || 0, o, xs: [wrap(x)], ys: [wrap(y)], m, ang, dash: 0, prot: 0, dead: false, r: ballR(m), d: 0, kx: 0, ky: 0, mergeT: time + 15 };
+  o.pieces.push(c); pieces.push(c); return c;
+}
+function ballSplit(o) {
+  if (time < o.splitCd) return false;
+  let did = false;
+  const list = o.pieces.slice().sort((a, b) => b.m - a.m);
+  for (const c of list) {
+    if (o.pieces.length >= BALL_MAX) break;
+    if (c.m < BALL_SPLIT) continue;
+    c.m /= 2; c.r = ballR(c.m); c.mergeT = time + 15;
+    const a = o.tAng, n = newCell(o, c.xs[0] + Math.cos(a) * c.r, c.ys[0] + Math.sin(a) * c.r, c.m, a, c.id);
+    n.kx = Math.cos(a) * 900; n.ky = Math.sin(a) * 900; n.prot = c.prot;
+    did = true;
+  }
+  if (did) o.splitCd = time + .4;
+  return did;
+}
+function popCell(c) {
+  const o = c.o, k = Math.min(8, BALL_MAX - o.pieces.length + 1);
+  if (k < 2) return;
+  c.m /= k; c.r = ballR(c.m); c.mergeT = time + 15;
+  for (let i = 1; i < k; i++) {
+    const a = i / (k - 1) * TAU, n = newCell(o, c.xs[0] + Math.cos(a) * c.r, c.ys[0] + Math.sin(a) * c.r, c.m, a, c.id);
+    n.kx = Math.cos(a) * 600; n.ky = Math.sin(a) * 600;
+  }
+}
+function ejectMass(o) {
+  if (!ballMode || time < (o.ejT || 0)) return;
+  o.ejT = time + .12;
+  for (const c of o.pieces) {
+    if (c.m < 32) continue;
+    c.m -= 14; c.r = ballR(c.m);
+    const a = o.tAng, x = c.xs[0] + Math.cos(a) * (c.r + 55), y = c.ys[0] + Math.sin(a) * (c.r + 55);
+    const f = addOrb(x, y, o.ti, 12); f.block = o.id; f.blockUntil = time + .8;
+    for (const v of specials) if (v.kind === 'vir' && Math.hypot(wd(v.x - f.x), wd(v.y - f.y)) < v.r + 30) {
+      const vx = v.x + Math.cos(a) * 90, vy = v.y + Math.sin(a) * 90; removeFood(v); addSpecial('vir', vx, vy); break;
+    }
+  }
+}
+function removeFood(f) {
+  const c = f.cell; if (c) { const i = c.items.indexOf(f); if (i >= 0) { c.items[i] = c.items[c.items.length - 1]; c.items.pop(); } }
+  f.gone = true; specials = specials.filter(q => q !== f); if (hosting()) netRem.push(f.id);
+}
+function ballOwnerStep(o, dt) {
+  const cs = o.pieces, n = cs.length, ax = Math.cos(o.tAng), ay = Math.sin(o.tAng);
+  let cx = 0, cy = 0; const x0 = cs[0].xs[0], y0 = cs[0].ys[0];
+  for (const c of cs) { cx += wd(c.xs[0] - x0) * c.m; cy += wd(c.ys[0] - y0) * c.m; }
+  const tm = total(o); cx = x0 + cx / tm; cy = y0 + cy / tm;
+  for (const c of cs) {
+    const sp = speedOf(c);
+    let vx = ax * sp, vy = ay * sp;
+    if (n > 1) { const dx = wd(cx - c.xs[0]), dy = wd(cy - c.ys[0]); vx += dx * 1.4; vy += dy * 1.4; }
+    const kd = Math.exp(-4 * dt); vx += c.kx; vy += c.ky; c.kx *= kd; c.ky *= kd;
+    c.xs[0] = wrap(c.xs[0] + vx * dt); c.ys[0] = wrap(c.ys[0] + vy * dt);
+    c.ang = o.tAng;
+    if (c.m > 150) c.m -= c.m * .002 * dt;
+    c.r = ballR(c.m);
+    eat(c, dt);
+  }
+  for (let i = 0; i < cs.length; i++) for (let j = i + 1; j < cs.length; j++) {
+    const a = cs[i], b = cs[j]; if (a.dead || b.dead) continue;
+    const dx = wd(b.xs[0] - a.xs[0]), dy = wd(b.ys[0] - a.ys[0]), d = Math.hypot(dx, dy) || .01, R = a.r + b.r;
+    if (time > a.mergeT && time > b.mergeT) {
+      if (d < Math.max(a.r, b.r) * .9) { const [big, sm] = a.m >= b.m ? [a, b] : [b, a]; big.m += sm.m; big.r = ballR(big.m); sm.dead = true; }
+    } else if (d < R) {
+      const push = (R - d) / 2, nx = dx / d, ny = dy / d;
+      a.xs[0] = wrap(a.xs[0] - nx * push); a.ys[0] = wrap(a.ys[0] - ny * push);
+      b.xs[0] = wrap(b.xs[0] + nx * push); b.ys[0] = wrap(b.ys[0] + ny * push);
+    }
+  }
+  o.pieces = cs.filter(c => !c.dead);
+}
+function ballCollide() {
+  const eaten = [];
+  for (const a of pieces) {
+    if (a.dead || a.prot > time || a.o.ghostUntil > time) continue;
+    for (const b of pieces) {
+      if (b === a || b.dead || b.o === a.o || same(a.o, b.o) || b.prot > time || b.o.ghostUntil > time) continue;
+      if (a.m < b.m * 1.25) continue;
+      const lim = a.r - b.r * .4; if (lim <= 0) continue;
+      const dx = wd(b.xs[0] - a.xs[0]), dy = wd(b.ys[0] - a.ys[0]);
+      if (dx * dx + dy * dy < lim * lim) eaten.push([b, a]);
+    }
+  }
+  for (const [b, a] of eaten) if (!b.dead && !a.dead) kill(b, a);
+}
 function makePiece(o, x, y, ang, m) {
-  const p = { id: ++nextPid, parent: 0, o, xs: [], ys: [], m, ang, dash: 0, prot: 0, dead: false, r: radiusOf(m), d: Math.min(8, radiusOf(m) * .5) };
-  const n = Math.min(SEG_MAX, Math.floor(m));
+  const p = { id: ++nextPid, parent: 0, o, xs: [], ys: [], m, ang, dash: 0, prot: 0, dead: false, r: ballMode ? ballR(m) : radiusOf(m), d: ballMode ? 0 : Math.min(8, radiusOf(m) * .5), kx: 0, ky: 0, mergeT: 0 };
+  const n = ballMode ? 1 : Math.min(SEG_MAX, Math.floor(m));
   for (let i = 0; i < n; i++) { p.xs.push(wrap(x - Math.cos(ang) * p.d * i)); p.ys.push(wrap(y - Math.sin(ang) * p.d * i)); }
   return p;
 }
 function addTurbo(o, dur) { o.turboLv = Math.min(5, (o.turboUntil > time ? o.turboLv | 0 : 0) + 1); o.turboUntil = Math.max(o.turboUntil, time + dur); }
-function speedOf(p) { let sp = Math.max(75, 210 / (1 + p.m / 150)); if (p.dash > 0) sp *= 2.6; if (p.o.slowUntil > time) sp *= .2; if (p.o.turboUntil > time) sp *= 1 + .4 * Math.max(1, p.o.turboLv | 0); if (speedUntil > time) sp *= 1.5; return sp; }
+function speedOf(p) { let sp = ballMode ? Math.max(50, 320 / (1 + Math.sqrt(p.m) / 10)) : Math.max(75, 210 / (1 + p.m / 150)); if (p.dash > 0) sp *= 2.6; if (p.o.slowUntil > time) sp *= .2; if (p.o.turboUntil > time) sp *= 1 + .4 * Math.max(1, p.o.turboLv | 0); if (speedUntil > time) sp *= 1.5; return sp; }
 function updatePiece(p, dt, tAng) {
   const r = p.r = radiusOf(p.m), d = p.d = Math.min(8, r * .5), xs = p.xs, ys = p.ys;
   const turn = 4.2 / (1 + p.m / 400) * dt, df = angDiff(tAng, p.ang);
@@ -426,7 +526,7 @@ function safeSpot() {
 }
 function spawn(o, m) {
   const [x, y] = safeSpot();
-  const p = makePiece(o, x, y, rnd(0, TAU), m || START_M);
+  const p = makePiece(o, x, y, rnd(0, TAU), m || (ballMode ? BALL_START : START_M));
   p.prot = time + (!o.bot ? DIFFS[diff].prot : 3); o.pieces = [p]; o.tAng = p.ang; o.splitT = -1; o.respawnAt = 0;
   pieces.push(p);
 }
@@ -452,12 +552,13 @@ function startWorld(humans, nBots, teams, tcol) {
   for (const h of humans || []) { const o = mkHuman(h); h.o = o; owners.push(o); if (!h.conn) player = o; }
   const nb = nBots;
   for (let i = 0; i < nb; i++) { const o = { id: ++nextOid, pieces: [] }; owners.push(o); newBot(o); }
-  for (const o of owners) spawn(o, o.bot ? rnd(DIFFS[diff].m[0], DIFFS[diff].m[1]) : START_M);
+  for (const o of owners) spawn(o, ballMode ? BALL_START : o.bot ? rnd(DIFFS[diff].m[0], DIFFS[diff].m[1]) : START_M);
   roundOn = !!(humans && humans.length); roundLeft = ROUND_T; finalOn = false; speedUntil = 0; kingId = 0; lastKing = 0; evNext = rnd(20, 30);
   const f = (player || owners[0]).pieces[0]; cam.x = f.xs[0]; cam.y = f.ys[0];
 }
 function rejoin(o) { o.deaths = 0; o.out = false; o.best = START_M; o.kills = 0; spawn(o); }
 function split(o) {
+  if (ballMode) return ballSplit(o);
   if (o.pieces.length !== 1 || time < o.splitCd) return false;
   const p = o.pieces[0], n = p.xs.length, h = n >> 1;
   if (p.m < SPLIT_MIN || h < 4) return false;
@@ -483,7 +584,8 @@ function kill(p, killer) {
     fxEmit(['eat', Math.round(killer.xs[0]), Math.round(killer.ys[0]), o.ti, gain(killer, p.m), ko.id]);
     ko.combo = time - (ko.lastKillT || -9) < 4 ? (ko.combo || 1) + 1 : 1; ko.lastKillT = time;
   }
-  spill(p, 0, p.m, killer && killer.o !== o ? killer.o : null);
+  if (ballMode && killer && killer.o !== o) { killer.m += p.m; killer.r = ballR(killer.m); }
+  else spill(p, 0, p.m, killer && killer.o !== o ? killer.o : null);
   o.pieces = o.pieces.filter(q => q !== p);
   if (killer && killer.o !== o) { killer.o.kills = (killer.o.kills | 0) + 1; const c = killer.o.combo; if (c >= 2) toastFor(killer.o, c === 2 ? 'c2' : c === 3 ? 'c3' : 'c4'); else toastFor(killer.o, 'tAte', o.name); }
   if (o.pieces.length === 0) {
@@ -544,19 +646,19 @@ function boost(o, k) {
 
 /* ---------- bots ---------- */
 function think(o) {
-  const me = o.pieces[0], hx = me.xs[0], hy = me.ys[0];
+  const me = ballMode ? o.pieces.reduce((a, b) => b.m > a.m ? b : a) : o.pieces[0], hx = me.xs[0], hy = me.ys[0];
   const D = DIFFS[diff];
   let fx = 0, fy = 0, threat = 0, prey = null, preyD = D.prey;
   for (const q of pieces) {
     if (q.o === o || q.dead || same(q.o, o)) continue;
-    const bigger = q.m > me.m + EQ, iAmBigger = me.m > q.m + EQ, avoid = !D.hunt && !q.o.bot && iAmBigger;
+    const bigger = ballMode ? q.m > me.m * 1.25 : q.m > me.m + EQ, iAmBigger = ballMode ? me.m > q.m * 1.25 : me.m > q.m + EQ, avoid = !D.hunt && !q.o.bot && iAmBigger;
     const smaller = iAmBigger && q.prot < time && !avoid;
     if (!bigger && !smaller && !avoid) continue;
     const hd = Math.abs(wd(q.xs[0] - hx)) + Math.abs(wd(q.ys[0] - hy));
     if (hd > q.xs.length * q.d + 600) continue;
     for (let i = 0; i < q.xs.length; i += 3) {
       const dx = wd(q.xs[i] - hx), dy = wd(q.ys[i] - hy), d = Math.sqrt(dx * dx + dy * dy);
-      if (bigger) { if (d < 300) { const w = (300 - d) / 300 / (d + 1); fx -= dx * w; fy -= dy * w; threat = Math.max(threat, (300 - d) / 300); } }
+      if (bigger) { const TR = 300 + (ballMode ? q.r : 0); if (d < TR) { const w = (TR - d) / TR / (d + 1); fx -= dx * w; fy -= dy * w; threat = Math.max(threat, (TR - d) / TR); } }
       else if (avoid) { if (d < 170) { const w = (170 - d) / 170 / (d + 1); fx -= dx * w; fy -= dy * w; threat = Math.max(threat, (170 - d) / 170); } }
       else if (d < preyD) { preyD = d; prey = { x: dx, y: dy, q }; }
     }
@@ -566,7 +668,7 @@ function think(o) {
   if (prey) {
     o.tAng = Math.atan2(prey.y, prey.x);
     if (D.hunt && preyD < 220 && Math.random() < .15) boost(o, 'spd');
-    if (me.m >= 30 && preyD < 200 && prey.q.m < me.m / 2 - EQ && Math.random() < D.split) split(o);
+    if (ballMode ? (o.pieces.length < 4 && preyD < 320 && me.m / 2 > prey.q.m * 1.25 && Math.random() < D.split) : (me.m >= 30 && preyD < 200 && prey.q.m < me.m / 2 - EQ && Math.random() < D.split)) split(o);
     return;
   }
   const cx = (hx / CELL) | 0, cy = (hy / CELL) | 0; let bs = 0, bx = 0, by = 0;
@@ -596,6 +698,7 @@ function step(dt) {
     if (o.out) { if (o.bot && time >= o.replaceAt) { newBot(o); spawn(o); } continue; }
     if (o.pieces.length === 0) { if (time >= o.respawnAt) spawn(o); continue; }
     if (o.bot) { o.think -= dt; if (o.think <= 0) { o.think = DIFFS[diff].think; think(o); } }
+    if (ballMode) { ballOwnerStep(o, dt); continue; }
     const A = o.pieces[0], B = o.pieces[1];
     updatePiece(A, dt, o.tAng); eat(A, dt);
     if (B) {
@@ -611,7 +714,8 @@ function step(dt) {
   pieces = pieces.filter(p => !p.dead);
   // head vs body
   const dead = [], cut = [];
-  for (const a of pieces) {
+  if (ballMode) ballCollide();
+  else for (const a of pieces) {
     if (a.prot > time || a.o.ghostUntil > time) continue;
     const hx = a.xs[0], hy = a.ys[0];
     for (const b of pieces) {
@@ -698,11 +802,11 @@ function drawFx() {
   ctx.globalAlpha = 1;
   if (kingId !== rKing) {
     const a = headOf(rKing), b = headOf(kingId);
-    crown = a && b ? { x: a.xs[0], y: a.ys[0] - a.r * 2.1 - 26, t0: time } : null; rKing = kingId;
+    crown = a && b ? { x: a.xs[0], y: a.ys[0] - (ballMode ? a.r + 30 : a.r * 2.1 + 26), t0: time } : null; rKing = kingId;
   }
   const kh = headOf(kingId);
   if (kh) {
-    let x = kh.xs[0], y = kh.ys[0] - kh.r * 2.1 - 26, sz = 24;
+    let x = kh.xs[0], y = kh.ys[0] - (ballMode ? kh.r + 30 : kh.r * 2.1 + 26), sz = 24;
     if (crown && time - crown.t0 < .8) {
       const k = (time - crown.t0) / .8, e = 1 - (1 - k) * (1 - k);
       x = crown.x + wd(x - crown.x) * e; y = crown.y + wd(y - crown.y) * e - Math.sin(k * Math.PI) * 120; sz = 24 + Math.sin(k * Math.PI) * 22;
@@ -873,6 +977,30 @@ function drawBody(c, T, n, r, ang, t, seed, noPat) {
   } else { c.scale(s, s); c.translate(5, 0); drawHead(c, T, t, seed); }
   c.restore();
 }
+function drawBall(p, T) {
+  const x = P[0], y = P[1], r = p.r, c = ctx;
+  const g = c.createRadialGradient(x - r * .35, y - r * .4, r * .1, x, y, r);
+  g.addColorStop(0, T.hi); g.addColorStop(.55, T.c); g.addColorStop(1, T.lo);
+  c.fillStyle = g; c.beginPath(); c.arc(x, y, r, 0, TAU); c.fill();
+  c.strokeStyle = T.lo; c.lineWidth = Math.max(2, r * .06); c.stroke();
+  if (!plainWorld) { c.fillStyle = T.p; c.globalAlpha *= .55; c.beginPath(); for (let i = 0; i < 5; i++) { const a = i * 1.26 + p.o.seed, rr = r * .62; c.moveTo(x + Math.cos(a) * rr + r * .1, y + Math.sin(a) * rr); c.arc(x + Math.cos(a) * rr, y + Math.sin(a) * rr, r * .1, 0, TAU); } c.fill(); c.globalAlpha /= .55; }
+  c.fillStyle = 'rgba(255,255,255,.35)'; c.beginPath(); c.ellipse(x - r * .38, y - r * .45, r * .32, r * .16, -.6, 0, TAU); c.fill();
+  const a = p.ang, fx = Math.cos(a), fy = Math.sin(a), nx = -fy, ny = fx, er = r * .17;
+  for (const sg of [1, -1]) {
+    const ex = x + fx * r * .32 + nx * sg * r * .3, ey = y + fy * r * .32 + ny * sg * r * .3;
+    c.fillStyle = T.eye; c.beginPath(); c.arc(ex, ey, er, 0, TAU); c.fill();
+    c.save(); c.translate(ex, ey); c.rotate(a); c.fillStyle = '#0a0612'; c.beginPath(); c.ellipse(er * .2, 0, er * .25, er * .8, 0, 0, TAU); c.fill(); c.restore();
+    c.strokeStyle = T.lo; c.lineWidth = er * .45; c.lineCap = 'round'; c.beginPath();
+    c.moveTo(ex - fx * er * 1.1 + nx * sg * er * 1.5, ey - fy * er * 1.1 + ny * sg * er * 1.5); c.lineTo(ex + fx * er * .9 - nx * sg * er * .2, ey + fy * er * .9 - ny * sg * er * .2); c.stroke();
+  }
+}
+function drawVirus(f, x, y, pul) {
+  const r = f.r, c = ctx, n = 22;
+  c.fillStyle = 'rgba(57,211,83,.85)'; c.strokeStyle = '#1b7a2a'; c.lineWidth = 3; c.beginPath();
+  for (let i = 0; i <= n * 2; i++) { const a = i / (n * 2) * TAU + time * .3, rr = i % 2 ? r : r * .86 * pul; c.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr); }
+  c.closePath(); c.fill(); c.stroke();
+  c.fillStyle = 'rgba(255,255,255,.25)'; c.beginPath(); c.ellipse(x - r * .3, y - r * .35, r * .3, r * .15, -.6, 0, TAU); c.fill();
+}
 function drawPiece(p, hw, hh) {
   const n = Math.min(p.xs.length, MAXN), T = plainWorld && worldTeams && p.o.team >= 0 ? teamType(p.o.team) : p.o.type, m = p.r * 2.2 + 30;
   let any = false;
@@ -884,7 +1012,7 @@ function drawPiece(p, hw, hh) {
   if (!any) return;
   const prot = p.prot > time;
   ctx.globalAlpha = p.o.ghostUntil > time ? .35 : (prot ? .45 + .25 * Math.sin(time * 14) : 1);
-  drawBody(ctx, T, n, p.r, p.ang, time, p.o.seed, plainWorld);
+  if (ballMode) drawBall(p, T); else drawBody(ctx, T, n, p.r, p.ang, time, p.o.seed, plainWorld);
   if (p.o.slowUntil > time) { ctx.fillStyle = 'rgba(175,235,255,.5)'; ctx.beginPath(); for (let i = 0; i < n; i += 2) if (VIS[i]) { ctx.moveTo(P[2 * i] + p.r, P[2 * i + 1]); ctx.arc(P[2 * i], P[2 * i + 1], p.r, 0, TAU); } ctx.fill(); }
   ctx.globalAlpha = 1;
   if (VIS[0] && p.o.magUntil > time) {
@@ -892,17 +1020,18 @@ function drawPiece(p, hw, hh) {
     ctx.beginPath(); ctx.arc(P[0], P[1], MAG_R, 0, TAU); ctx.fill(); ctx.stroke();
   }
   if (VIS[0]) {
-    if (prot) { ctx.strokeStyle = 'rgba(126,242,200,.8)'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(P[0], P[1], p.r * 2.4, 0, TAU); ctx.stroke(); }
+    if (prot) { ctx.strokeStyle = 'rgba(126,242,200,.8)'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(P[0], P[1], p.r * (ballMode ? 1.2 : 2.4), 0, TAU); ctx.stroke(); }
     ctx.font = (p.o === player ? '800 ' : '600 ') + Math.round(13 / cam.z) + "px Outfit, sans-serif"; ctx.textAlign = 'center';
     const king = p.o.id === kingId;
-    if (p.o.shield) { ctx.strokeStyle = 'rgba(110,195,255,.9)'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(P[0], P[1], p.r * 2, 0, TAU); ctx.stroke(); }
-    if (p.o.slowUntil > time) { ctx.strokeStyle = 'rgba(155,231,255,.7)'; ctx.lineWidth = 2; ctx.setLineDash([5, 5]); ctx.beginPath(); ctx.arc(P[0], P[1], p.r * 1.7, 0, TAU); ctx.stroke(); ctx.setLineDash([]); }
-    if (worldTeams && p.o.team >= 0) { ctx.strokeStyle = teamCol(p.o.team); ctx.lineWidth = 3; ctx.globalAlpha = .8; ctx.beginPath(); ctx.arc(P[0], P[1], p.r * 1.45, 0, TAU); ctx.stroke(); ctx.globalAlpha = 1; }
+    if (p.o.shield) { ctx.strokeStyle = 'rgba(110,195,255,.9)'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(P[0], P[1], p.r * (ballMode ? 1.12 : 2), 0, TAU); ctx.stroke(); }
+    if (p.o.slowUntil > time) { ctx.strokeStyle = 'rgba(155,231,255,.7)'; ctx.lineWidth = 2; ctx.setLineDash([5, 5]); ctx.beginPath(); ctx.arc(P[0], P[1], p.r * (ballMode ? 1.08 : 1.7), 0, TAU); ctx.stroke(); ctx.setLineDash([]); }
+    if (worldTeams && p.o.team >= 0) { ctx.strokeStyle = teamCol(p.o.team); ctx.lineWidth = 3; ctx.globalAlpha = .8; ctx.beginPath(); ctx.arc(P[0], P[1], p.r * (ballMode ? 1.06 : 1.45), 0, TAU); ctx.stroke(); ctx.globalAlpha = 1; }
     ctx.fillStyle = worldTeams && p.o.team >= 0 ? teamCol(p.o.team) : king ? '#ffd23f' : (p.o === player ? '#7ef2c8' : 'rgba(255,255,255,.8)');
-    ctx.fillText(p.o.name, P[0], P[1] - p.r * 2.1 - 6);
+    if (ballMode) { const fs = Math.max(11, Math.min(p.r * .34, 40)); ctx.font = '800 ' + Math.round(fs) + 'px Outfit, sans-serif'; ctx.lineWidth = fs * .18; ctx.strokeStyle = 'rgba(23,16,58,.8)'; ctx.strokeText(p.o.name, P[0], P[1] + p.r * .72); ctx.fillText(p.o.name, P[0], P[1] + p.r * .72); }
+    else ctx.fillText(p.o.name, P[0], P[1] - p.r * 2.1 - 6);
   }
 }
-const BCOL = { tur: '#ff7a1a', dbl: '#7ef2c8', shd: '#6ec3ff', gho: '#ffffff', frz: '#9be7ff', mag: '#ff5fb0', g10: '#ffd23f', g50: '#ff9a1a' };
+const BCOL = { vir: '#39d353', tur: '#ff7a1a', dbl: '#7ef2c8', shd: '#6ec3ff', gho: '#ffffff', frz: '#9be7ff', mag: '#ff5fb0', g10: '#ffd23f', g50: '#ff9a1a' };
 function drawBonus(f, x, y, pul) {
   const col = BCOL[f.kind];
   ctx.globalAlpha = .22; ctx.fillStyle = col; ctx.beginPath(); ctx.arc(x, y, f.r * 1.7 * pul, 0, TAU); ctx.fill(); ctx.globalAlpha = 1;
@@ -942,7 +1071,8 @@ function render() {
   ctx.fill();
   for (const f of sp) {
     const x = wd(f.x - cam.x), y = wd(f.y - cam.y), pul = 1 + .12 * Math.sin(time * 5 + f.x);
-    if (f.kind !== 'mag' && f.kind !== 'g10' && f.kind !== 'g50') drawBonus(f, x, y, pul);
+    if (f.kind === 'vir') drawVirus(f, x, y, 1 + .04 * Math.sin(time * 3 + f.x));
+    else if (f.kind !== 'mag' && f.kind !== 'g10' && f.kind !== 'g50') drawBonus(f, x, y, pul);
     else if (f.kind === 'mag') {
       ctx.fillStyle = 'rgba(255,95,176,.22)'; ctx.beginPath(); ctx.arc(x, y, f.r * 1.7 * pul, 0, TAU); ctx.fill();
       ctx.fillStyle = '#2a1a5e'; ctx.strokeStyle = '#ff5fb0'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, f.r, 0, TAU); ctx.fill(); ctx.stroke();
@@ -995,7 +1125,7 @@ const STR = {
     len: 'Boy', split: 'BÖL', bSpd: 'HIZ', bMag: 'MIKNATIS', hMag: 'Mıknatıs', hGho: 'Hayalet', hShd: 'Kalkan', hSlow: 'Yavaş',
     tMag: 'Mıknatıs!', tShd: 'Kalkan!', tGho: 'Hayalet!', tFrz: 'Dondurucu!', tSlow: 'Dondun!', tTur: 'Turbo!', tDbl: 'Çift yem!', hTur: 'Turbo', hDbl: 'x2 yem', tPlus: '+{0}', tAte: '{0} yem oldu!', tEaten: '{0} seni yedi', tDead: 'Yendin',
     tHalf: 'Yarın gitti!', tHit: 'Çarptın!', tBit: 'Kuyruğun koptu!', tShdBreak: 'Kalkan kırıldı!', tKing: 'Kralı yedin! +20',
-    evRain: 'Yem yağmuru!', evGold: 'Altın fırtınası!', evSpeed: 'Herkes hızlı!', evFinal: 'Son 30 saniye! Yemler çift sayılır.', evMag: 'Herkese mıknatıs!', botsOn: 'Botlar: Açık', botsOff: 'Bot yok (botsuz mod)', botN: 'Bot sayısı: {0}', patOn: 'Desen: Açık', patOff: 'Desen: Kapalı (düz renk)', teamOn: 'Takım savaşı: Açık', teamOff: 'Takım savaşı: Kapalı', teamPick: 'Takımını seç:', tColor: 'Renk:', tWin: 'Kazanan: {0} takım!', botWarn: '30 üstü bot eski telefonlarda kasabilir.', need2: 'Botsuz oyun için en az 2 kişi gerekli.', spec: 'Elendin! Tur bitene kadar izliyorsun.', timeUp: 'SÜRE BİTTİ!', c2: 'ÇİFT!', c3: 'ÜÇLÜ!', c4: 'DURDURULAMAZ!', kingMe: 'Kral sensin!',
+    evRain: 'Yem yağmuru!', evGold: 'Altın fırtınası!', evSpeed: 'Herkes hızlı!', evFinal: 'Son 30 saniye! Yemler çift sayılır.', evMag: 'Herkese mıknatıs!', botsOn: 'Botlar: Açık', botsOff: 'Bot yok (botsuz mod)', botN: 'Bot sayısı: {0}', gmSnake: 'Mod: Yılan', gmBall: 'Mod: Top (Agar.io gibi)', eject: 'AT', tPop: 'Patladın!', patOn: 'Desen: Açık', patOff: 'Desen: Kapalı (düz renk)', teamOn: 'Takım savaşı: Açık', teamOff: 'Takım savaşı: Kapalı', teamPick: 'Takımını seç:', tColor: 'Renk:', tWin: 'Kazanan: {0} takım!', botWarn: '30 üstü bot eski telefonlarda kasabilir.', need2: 'Botsuz oyun için en az 2 kişi gerekli.', spec: 'Elendin! Tur bitene kadar izliyorsun.', timeUp: 'SÜRE BİTTİ!', c2: 'ÇİFT!', c3: 'ÜÇLÜ!', c4: 'DURDURULAMAZ!', kingMe: 'Kral sensin!',
     mis: 'Görev: {0}', mKills: '{0} yılan ye', mLen: '{0} boya ulaş', mGold: '{0} altın yem topla', mMag: '{0} mıknatıs topla', misDone: 'Görev tamam!', unlock: 'Yeni yılan açıldı: {0}', locked: 'Kilitli · {0} görev'
   },
   de: {
@@ -1012,7 +1142,7 @@ const STR = {
     len: 'Länge', split: 'TEIL', bSpd: 'TEMPO', bMag: 'MAGNET', hMag: 'Magnet', hGho: 'Geist', hShd: 'Schild', hSlow: 'Langsam',
     tMag: 'Magnet!', tShd: 'Schild!', tGho: 'Geist!', tFrz: 'Frost!', tSlow: 'Eingefroren!', tTur: 'Turbo!', tDbl: 'Doppeltes Futter!', hTur: 'Turbo', hDbl: 'x2 Futter', tPlus: '+{0}', tAte: '{0} gefressen!', tEaten: '{0} hat dich gefressen', tDead: 'Gefressen',
     tHalf: 'Hälfte verloren!', tHit: 'Aufprall!', tBit: 'Schwanz ab!', tShdBreak: 'Schild zerbrochen!', tKing: 'König gefressen! +20',
-    evRain: 'Futterregen!', evGold: 'Goldsturm!', evSpeed: 'Alle schnell!', evFinal: 'Letzte 30 Sekunden! Futter zählt doppelt.', evMag: 'Magnet für alle!', botsOn: 'Bots: An', botsOff: 'Keine Bots (ohne Bots)', botN: 'Bots: {0}', patOn: 'Muster: An', patOff: 'Muster: Aus (einfarbig)', teamOn: 'Teamkampf: An', teamOff: 'Teamkampf: Aus', teamPick: 'Wähle dein Team:', tColor: 'Farbe:', tWin: 'Sieger: Team {0}!', botWarn: 'Über 30 Bots kann ältere Handys ruckeln lassen.', need2: 'Ohne Bots braucht ihr mindestens 2 Spieler.', spec: 'Ausgeschieden! Du schaust bis zum Rundenende zu.', timeUp: 'ZEIT UM!', c2: 'DOPPEL!', c3: 'DREIFACH!', c4: 'UNAUFHALTSAM!', kingMe: 'Du bist König!',
+    evRain: 'Futterregen!', evGold: 'Goldsturm!', evSpeed: 'Alle schnell!', evFinal: 'Letzte 30 Sekunden! Futter zählt doppelt.', evMag: 'Magnet für alle!', botsOn: 'Bots: An', botsOff: 'Keine Bots (ohne Bots)', botN: 'Bots: {0}', gmSnake: 'Modus: Schlange', gmBall: 'Modus: Ball (wie Agar.io)', eject: 'WURF', tPop: 'Geplatzt!', patOn: 'Muster: An', patOff: 'Muster: Aus (einfarbig)', teamOn: 'Teamkampf: An', teamOff: 'Teamkampf: Aus', teamPick: 'Wähle dein Team:', tColor: 'Farbe:', tWin: 'Sieger: Team {0}!', botWarn: 'Über 30 Bots kann ältere Handys ruckeln lassen.', need2: 'Ohne Bots braucht ihr mindestens 2 Spieler.', spec: 'Ausgeschieden! Du schaust bis zum Rundenende zu.', timeUp: 'ZEIT UM!', c2: 'DOPPEL!', c3: 'DREIFACH!', c4: 'UNAUFHALTSAM!', kingMe: 'Du bist König!',
     mis: 'Mission: {0}', mKills: 'Friss {0} Schlangen', mLen: 'Erreiche Länge {0}', mGold: 'Sammle {0} Goldfutter', mMag: 'Sammle {0} Magnete', misDone: 'Mission geschafft!', unlock: 'Neue Schlange frei: {0}', locked: 'Gesperrt · {0} Missionen'
   }
 };
@@ -1020,8 +1150,8 @@ function _t(k, a, b) { let v = (STR[lang] && STR[lang][k]) || STR.tr[k] || k; if
 const esc = v => (v + '').replace(/[&<>"']/g, c => '&#' + c.charCodeAt(0) + ';');
 const tname = i => lang === 'de' ? DE_NAMES[i] : TYPES[i].name;
 const isLocked = i => !!LOCKS[i] && save.stars < LOCKS[i];
-function persist() { try { localStorage.setItem('babaconda', JSON.stringify({ stars: save.stars, lang, soundOn, botCount, plain: plainPref })); } catch (e) {} }
-function loadSave() { try { const d = JSON.parse(localStorage.getItem('babaconda') || '{}'); save.stars = d.stars | 0; if (d.lang === 'de' || d.lang === 'tr') lang = d.lang; if (d.soundOn === false) soundOn = false; if (d.botCount >= 1 && d.botCount <= 40) botCount = d.botCount | 0; plainPref = d.plain === true; } catch (e) {} }
+function persist() { try { localStorage.setItem('babaconda', JSON.stringify({ stars: save.stars, lang, soundOn, botCount, plain: plainPref, ball: ballPref })); } catch (e) {} }
+function loadSave() { try { const d = JSON.parse(localStorage.getItem('babaconda') || '{}'); save.stars = d.stars | 0; if (d.lang === 'de' || d.lang === 'tr') lang = d.lang; if (d.soundOn === false) soundOn = false; if (d.botCount >= 1 && d.botCount <= 40) botCount = d.botCount | 0; plainPref = d.plain === true; ballPref = d.ball === true; } catch (e) {} }
 
 /* ---------- sound and voice ---------- */
 let actx = null;
@@ -1067,7 +1197,7 @@ function fx(dt) {
   if (n > 0 && fxAlive && len > fxLen + .2 && eatT <= 0) { SFX.eat(); eatT = .09; }
   fxAlive = n > 0; fxPieces = n; fxLen = len;
 }
-const TOAST_SFX = { c2: 'combo', c3: 'combo', c4: 'combo', tTur: 'bonus', tDbl: 'bonus', tMag: 'bonus', tShd: 'bonus', tGho: 'bonus', tFrz: 'bonus', tPlus: 'bonus', tAte: 'bonus', tKing: 'bonus', misDone: 'bonus', tHalf: 'hit', tHit: 'hit', tBit: 'hit', tShdBreak: 'hit', tSlow: 'hit' };
+const TOAST_SFX = { tPop: 'hit', c2: 'combo', c3: 'combo', c4: 'combo', tTur: 'bonus', tDbl: 'bonus', tMag: 'bonus', tShd: 'bonus', tGho: 'bonus', tFrz: 'bonus', tPlus: 'bonus', tAte: 'bonus', tKing: 'bonus', misDone: 'bonus', tHalf: 'hit', tHit: 'hit', tBit: 'hit', tShdBreak: 'hit', tSlow: 'hit' };
 function toast(msg, cls) { if (!msg) return; const t = $('toast'); t.textContent = msg; t.className = ''; void t.offsetWidth; t.className = 'on ' + (cls || 'gold'); toastT = time + 1.8; }
 function showToast(key, arg) {
   const k = TOAST_SFX[key];
@@ -1143,7 +1273,8 @@ function hud() {
   for (const [id, el] of Array.from(bRows)) if (!seen.has(id)) { if (el.parentNode) el.parentNode.removeChild(el); bRows.delete(id); }
   bd.style.height = (4 + show.length * 17) + 'px';
   const sb = $('split'), p = player.pieces[0], cd = player.splitCd - time;
-  const can = p && player.pieces.length === 1 && cd <= 0 && p.m >= SPLIT_MIN;
+  const can = ballMode ? p && cd <= 0 && player.pieces.length < BALL_MAX && player.pieces.some(c => c.m >= BALL_SPLIT) : p && player.pieces.length === 1 && cd <= 0 && p.m >= SPLIT_MIN;
+  $('bEject').textContent = _t('eject');
   sb.classList.toggle('off', !can);
   sb.textContent = (cd > 0) ? Math.ceil(cd) : _t('split');
   for (const [id, k, cdv] of [['bSpd', 'bSpd', player.cdSpd - time], ['bMag', 'bMag', player.cdMag - time]]) {
@@ -1174,7 +1305,7 @@ function showPodium(top, myId, tr) {
 function applyLang() {
   const set = (id, k) => { $(id).textContent = _t(k); };
   set('mPick', 'pick'); set('dEasy', 'easy'); set('dNormal', 'normal'); set('dHard', 'hard'); set('play', 'play'); set('mkRoom', 'mk'); set('joinRoom', 'join');
-  set('langBtn', 'lang'); $('sndBtn').textContent = _t(soundOn ? 'sndOn' : 'sndOff'); $('patBtn').textContent = _t(plainPref ? 'patOff' : 'patOn'); set('mHelp', 'help'); set('mHelp2', 'help2');
+  set('langBtn', 'lang'); $('sndBtn').textContent = _t(soundOn ? 'sndOn' : 'sndOff'); $('patBtn').textContent = _t(plainPref ? 'patOff' : 'patOn'); $('gmBtn').textContent = _t(ballPref ? 'gmBall' : 'gmSnake'); set('mHelp', 'help'); set('mHelp2', 'help2');
   set('jTitle', 'jTitle'); set('jInfo', 'jInfo'); set('joinGo', 'joinGo'); set('joinBack', 'back'); set('rLabel', 'rLabel'); set('startBtn', 'start'); set('leaveBtn', 'leave');
   set('oTitle', 'oTitle'); set('oSub', 'oSub'); set('oBestL', 'oBest'); set('oKillsL', 'oKills'); set('pTitle', 'pTitle'); set('nextRound', 'next'); set('podMenu', 'menu'); set('lenL', 'len');
   $('name').placeholder = _t('name'); $('code').placeholder = _t('codePh');
@@ -1198,11 +1329,11 @@ function gameOver() {
   $('hud').classList.remove('on'); showOv('over');
 }
 function myName() { const v = (($('name').value || '') + '').trim().slice(0, 10); return v || 'SEN'; }
-function enterPlay() { endSeq = null; conf = []; $('bigMsg').className = ''; $('hud').classList.remove('spec'); mode = 'play'; mis = null; misWait = 0; misIdx = save.stars; fxAlive = false; showOv(null); $('hud').classList.add('on'); hud(); }
-function play() { unlockAudio(); startWorld([{ name: myName(), ti: selType }], Math.max(1, botCount), false); plainWorld = plainPref; enterPlay(); }
+function enterPlay() { endSeq = null; conf = []; $('bigMsg').className = ''; $('hud').classList.remove('spec'); $('hud').classList.toggle('ball', ballMode); mode = 'play'; mis = null; misWait = 0; misIdx = save.stars; fxAlive = false; showOv(null); $('hud').classList.add('on'); hud(); }
+function play() { unlockAudio(); ballMode = ballPref; startWorld([{ name: myName(), ti: selType }], Math.max(1, botCount), false); plainWorld = plainPref; enterPlay(); }
 function toMenu(msg) {
   leaveNet(); endSeq = null; conf = []; $('bigMsg').className = ''; mode = 'menu'; player = null; $('hud').classList.remove('on'); showOv('menu'); $('menuMsg').textContent = msg || ''; $('mStars').textContent = _t('stars', save.stars);
-  startWorld(null, 15, false); plainWorld = plainPref;
+  ballMode = ballPref; startWorld(null, 15, false); plainWorld = plainPref;
 }
 
 /* ---------- multiplayer ---------- */
@@ -1221,7 +1352,7 @@ function freeType(want, rid) {
 function sendTo(conn, m) { try { if (conn && conn.open) conn.send(m); } catch (e) {} }
 function castLobby() {
   const players = net.room.map(r => ({ id: r.id, name: r.name, ti: r.ti, team: r.team | 0 }));
-  for (const r of net.room) if (r.conn) sendTo(r.conn, { t: 'lobby', players, you: r.id, code: net.code, nBots: net.nBots, teams: net.teams, tcol: net.tcol, plain: net.plain });
+  for (const r of net.room) if (r.conn) sendTo(r.conn, { t: 'lobby', players, you: r.id, code: net.code, nBots: net.nBots, teams: net.teams, tcol: net.tcol, plain: net.plain, ball: net.ball });
   drawRoom();
 }
 function drawRoom() {
@@ -1235,6 +1366,7 @@ function drawRoom() {
   const need = !net.nBots && net.room.length < 2; $('startBtn').style.opacity = need ? '.5' : '1';
   if (need) $('roomMsg').textContent += ' · ' + _t('need2');
   const host = net.role === 'host';
+  $('rGmBtn').textContent = _t(net.ball ? 'gmBall' : 'gmSnake'); $('rGmBtn').style.opacity = host ? '1' : '.6';
   $('rPatBtn').textContent = _t(net.plain ? 'patOff' : 'patOn'); $('rPatBtn').style.opacity = host ? '1' : '.6';
   $('teamBtn').textContent = _t(net.teams ? 'teamOn' : 'teamOff'); $('teamBtn').style.opacity = host ? '1' : '.6';
   $('teamBox').style.display = net.teams ? 'block' : 'none'; $('tColRow').style.display = host ? 'flex' : 'none';
@@ -1256,7 +1388,7 @@ function allFood() { const a = []; for (const c of cells) for (const f of c.item
 function hostAdmit(r) {
   if (worldTeams && r.team === undefined) r.team = smallTeam(null);
   const o = mkHuman(r); r.o = o; owners.push(o); spawn(o);
-  sendTo(r.conn, { t: 'start', you: o.id, food: allFood(), gc: GC, nb: worldNoBots, tm: worldTeams, tc: worldTcol, pl: plainWorld });
+  sendTo(r.conn, { t: 'start', you: o.id, food: allFood(), gc: GC, nb: worldNoBots, tm: worldTeams, tc: worldTcol, pl: plainWorld, bm: ballMode });
 }
 function hostDrop(r) {
   net.room = net.room.filter(q => q !== r);
@@ -1271,11 +1403,12 @@ function hostMsg(r, m) {
   else if (m.t === 'in') { if (typeof m.a === 'number' && isFinite(m.a)) r.o.tAng = m.a; }
   else if (m.t === 'split') split(r.o);
   else if (m.t === 'boost') boost(r.o, m.k === 'mag' ? 'mag' : 'spd');
+  else if (m.t === 'eject') ejectMass(r.o);
   else if (m.t === 'rejoin') { if (r.o.out) rejoin(r.o); }
 }
 function makeRoom() {
   if (typeof Peer === 'undefined') { $('menuMsg').textContent = _t('eNoNet'); return; }
-  unlockAudio(); leaveNet(); net.role = 'host'; net.myRid = 0; net.code = ''; net.nBots = botCount; net.teams = false; net.tcol = [0, 1]; net.plain = plainPref;
+  unlockAudio(); leaveNet(); net.role = 'host'; net.myRid = 0; net.code = ''; net.nBots = botCount; net.teams = false; net.tcol = [0, 1]; net.plain = plainPref; net.ball = ballPref;
   net.room = [{ id: 0, name: myName(), ti: selType, conn: null }];
   mode = 'room'; showOv('room'); drawRoom(); $('roomMsg').textContent = _t('making');
   let rid = 0;
@@ -1308,10 +1441,10 @@ function makeRoom() {
 function startRoom() {
   if (net.role !== 'host' || !net.code) return;
   if (!net.nBots && net.room.length < 2) { drawRoom(); return; }
-  startWorld(net.room, net.nBots, net.teams, net.tcol); plainWorld = !!net.plain;
+  ballMode = !!net.ball; startWorld(net.room, net.nBots, net.teams, net.tcol); plainWorld = !!net.plain;
   net.started = true; netAdd = []; netRem = [];
   const food = allFood();
-  for (const r of net.room) if (r.conn) sendTo(r.conn, { t: 'start', you: r.o.id, food, gc: GC, nb: worldNoBots, tm: worldTeams, tc: worldTcol, pl: plainWorld });
+  for (const r of net.room) if (r.conn) sendTo(r.conn, { t: 'start', you: r.o.id, food, gc: GC, nb: worldNoBots, tm: worldTeams, tc: worldTcol, pl: plainWorld, bm: ballMode });
   enterPlay();
 }
 const r1 = v => Math.round(v * 10) / 10, r3 = v => Math.round(v * 1000) / 1000;
@@ -1343,11 +1476,11 @@ function clientMsg(m) {
   if (!m) return;
   if (m.t === 'full') { leaveNet(); $('joinMsg').textContent = _t('eFull'); }
   else if (m.t === 'lobby') {
-    net.room = m.players; net.myRid = m.you; net.nBots = m.nBots | 0; net.teams = !!m.teams; net.tcol = m.tcol || [0, 1]; net.plain = !!m.plain;
+    net.room = m.players; net.myRid = m.you; net.nBots = m.nBots | 0; net.teams = !!m.teams; net.tcol = m.tcol || [0, 1]; net.plain = !!m.plain; net.ball = !!m.ball;
     if (!net.started && mode !== 'room') { mode = 'room'; showOv('room'); }
     drawRoom();
   } else if (m.t === 'start') {
-    setMap(m.gc || 25); worldNoBots = !!m.nb; worldTeams = !!m.tm; if (m.tc) worldTcol = m.tc; plainWorld = !!m.pl;
+    ballMode = !!m.bm; setMap(m.gc || 25); worldNoBots = !!m.nb; worldTeams = !!m.tm; if (m.tc) worldTcol = m.tc; plainWorld = !!m.pl;
     owners = []; pieces = []; player = null; time = 0; specials = []; homing = []; parts = []; rings = []; floats = [];
     ownById.clear(); pcById.clear(); foodById.clear();
     cells = []; for (let i = 0; i < GC * GC; i++) cells.push({ items: [], dots: 0 });
@@ -1397,6 +1530,7 @@ function applySnap(m) {
 function clientStep(dt) {
   time += dt; roundLeft -= dt;
   for (const p of pieces) {
+    if (ballMode) { p.r = ballR(p.m); const sp = speedOf(p), k = Math.min(1, dt * 10); p.sx = wrap(p.sx + Math.cos(p.sang) * sp * dt); p.sy = wrap(p.sy + Math.sin(p.sang) * sp * dt); p.xs[0] = wrap(p.xs[0] + wd(p.sx - p.xs[0]) * k); p.ys[0] = wrap(p.ys[0] + wd(p.sy - p.ys[0]) * k); p.ang = p.sang; continue; }
     p.dash = p.dashOn ? 1 : 0;
     const sp = speedOf(p);
     p.sx = wrap(p.sx + Math.cos(p.sang) * sp * dt); p.sy = wrap(p.sy + Math.sin(p.sang) * sp * dt);
@@ -1413,6 +1547,11 @@ function doBoost(k) {
   if (isClient()) { sendTo(net.conn, { t: 'boost', k }); if (k === 'mag') player.cdMag = time + BOOST_CD; else player.cdSpd = time + BOOST_CD; }
   else boost(player, k);
   SFX.bonus(); hud();
+}
+function doEject() {
+  if (!player || mode !== 'play' || !ballMode) return;
+  if (isClient()) sendTo(net.conn, { t: 'eject' }); else ejectMass(player);
+  beep(500, 300, .06, 'sine', .06);
 }
 function doSplit() {
   if (!player || mode !== 'play') return;
@@ -1432,6 +1571,7 @@ cv.addEventListener('pointermove', e => {
 const up = e => { if (e.pointerId === steerId) steerId = null; };
 cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
 $('bSpd').addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); doBoost('spd'); });
+$('bEject').addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); doEject(); });
 $('bMag').addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); doBoost('mag'); });
 $('split').addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); doSplit(); });
 window.addEventListener('keydown', e => { if (e.code === 'Space') doSplit(); });
@@ -1460,6 +1600,8 @@ const bstep = (v, d, min) => { let i = BSTEPS.indexOf(v); if (i < 0) i = BSTEPS.
 function drawBots() { $('botLbl').textContent = _t('botN', botCount); $('botWarn').textContent = botCount > 30 ? _t('botWarn') : ''; }
 $('botMinus').addEventListener('click', () => { botCount = bstep(botCount, -1, 1); persist(); drawBots(); });
 $('botPlus').addEventListener('click', () => { botCount = bstep(botCount, 1, 1); persist(); drawBots(); });
+$('gmBtn').addEventListener('click', () => { ballPref = !ballPref; persist(); applyLang(); if (mode === 'menu') { ballMode = ballPref; startWorld(null, 15, false); } });
+$('rGmBtn').addEventListener('click', () => { if (net.role !== 'host' || net.started) return; net.ball = !net.ball; castLobby(); });
 $('patBtn').addEventListener('click', () => { plainPref = !plainPref; if (mode === 'menu') plainWorld = plainPref; persist(); applyLang(); });
 $('rPatBtn').addEventListener('click', () => { if (net.role !== 'host' || net.started) return; net.plain = !net.plain; castLobby(); });
 $('teamBtn').addEventListener('click', () => { if (net.role !== 'host' || net.started) return; net.teams = !net.teams; castLobby(); });
@@ -1538,19 +1680,26 @@ function frame(now) {
   fx(dt); updateFx(dt); tickCountdown();
   const lead = () => { let b = null, bt = -1; for (const q of owners) if (q.pieces.length) { const t = total(q); if (t > bt) { bt = t; b = q; } } return b; };
   const o = (player && !player.out) ? player : (mode === 'play' ? null : mode === 'spec' ? lead() : owners.find(q => q.pieces.length));
-  const f = o && o.pieces[0];
+  let f = o && o.pieces[0];
+  if (f && ballMode) {
+    let sx = 0, sy = 0, tm = 0, spread = 0; const x0 = f.xs[0], y0 = f.ys[0];
+    for (const c of o.pieces) { sx += wd(c.xs[0] - x0) * c.m; sy += wd(c.ys[0] - y0) * c.m; tm += c.m; }
+    const gx = x0 + sx / tm, gy = y0 + sy / tm;
+    for (const c of o.pieces) spread = Math.max(spread, Math.hypot(wd(c.xs[0] - gx), wd(c.ys[0] - gy)) + c.r);
+    f = { xs: [wrap(gx)], ys: [wrap(gy)], R: Math.max(ballR(tm), spread) };
+  }
   if (f) {
     const k = Math.min(1, dt * 6);
     cam.x = wrap(cam.x + wd(f.xs[0] - cam.x) * k); cam.y = wrap(cam.y + wd(f.ys[0] - cam.y) * k);
     const base = Math.max(.8, Math.min(1.3, Math.min(vw, vh) / 460));
-    const tz = base * Math.max(.32, 1.05 - (f.r - 12) * .03) * (o.pieces.length > 1 ? .85 : 1);
+    const tz = ballMode ? base * Math.max(.22, Math.min(1.05, 1.18 - (f.R - 24) * .0042)) : base * Math.max(.32, 1.05 - (f.r - 12) * .03) * (o.pieces.length > 1 ? .85 : 1);
     cam.z += (tz - cam.z) * Math.min(1, dt * 2);
   }
   render();
   hudT -= dt; if (hudT <= 0) { hudT = .25; if (mode === 'play' || mode === 'spec') hud(); else if (toastT && time > toastT) { $('toast').classList.remove('on'); toastT = 0; } }
   requestAnimationFrame(frame);
 }
-loadSave(); plainWorld = plainPref; applyLang();
+loadSave(); plainWorld = plainPref; ballMode = ballPref; applyLang();
 startWorld(null);
 requestAnimationFrame(frame);
 })();
